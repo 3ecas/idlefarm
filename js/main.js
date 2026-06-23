@@ -5,6 +5,7 @@ import { mountMenu } from "./menu.js";
 import { mountMill } from "./mill.js";
 import { mountMoney } from "./money.js";
 import { mountPlot } from "./plot.js";
+import { mountSellMarket } from "./sellMarket.js";
 import { mountShopping } from "./shopping.js";
 import { mountTools } from "./tools.js";
 import { getCellSize } from "./layout.js";
@@ -14,6 +15,7 @@ import { applyStarterLayout, clearActiveTool, isCellHidden, isToolActive, moveCe
 const statusRoot = document.getElementById("status");
 const cellMount = document.getElementById("cell-mount");
 const marketMount = document.getElementById("market-mount");
+const sellMarketMount = document.getElementById("sell-market-mount");
 const moneyMount = document.getElementById("money-mount");
 const shoppingMount = document.getElementById("shopping-mount");
 const barnMount = document.getElementById("barn-mount");
@@ -29,6 +31,7 @@ function renderStatus() {
 
 mountPlot(cellMount);
 mountMarket(marketMount);
+mountSellMarket(sellMarketMount);
 mountMoney(moneyMount);
 mountShopping(shoppingMount);
 mountBarn(barnMount);
@@ -115,6 +118,11 @@ function refreshLayout() {
       top += getCellSize("market").height + gap;
     }
 
+    if (!isCellHidden("sellMarket")) {
+      moveCell("sellMarket", left, top);
+      top += getCellSize("sellMarket").height + gap;
+    }
+
     if (!isCellHidden("build")) {
       moveCell("build", left, top);
       top += getCellSize("build").height + gap;
@@ -136,7 +144,7 @@ function refreshLayout() {
     return;
   }
 
-  for (const key of ["market", "money", "barn", "build", "menu", "tools"]) {
+  for (const key of ["market", "sellMarket", "money", "barn", "build", "menu", "tools"]) {
     if (isCellHidden(key)) {
       continue;
     }

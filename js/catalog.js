@@ -35,7 +35,7 @@ export const PRODUCTS = {
   ...PROCESSED_GOODS,
 };
 
-export const MARKET_SECTIONS = [
+export const SHOP_SECTIONS = [
   {
     key: "seeds",
     label: "Seeds",
@@ -51,12 +51,9 @@ export const MARKET_SECTIONS = [
     label: "Materials",
     productIds: ["wood", "nails"],
   },
-  {
-    key: "sell",
-    label: "Sell",
-    productIds: [],
-  },
 ];
+
+export const MARKET_SECTIONS = SHOP_SECTIONS;
 
 export function getProduct(productId) {
   return getSeed(productId) || getCrop(productId) || MATERIALS[productId] || PROCESSED_GOODS[productId] || null;

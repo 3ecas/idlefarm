@@ -16,15 +16,16 @@ const FARM_STAGE_EMPTY = "empty";
 const FARM_STAGE_PLANTED = "planted";
 const FARM_STAGE_GROWING = "growing";
 const FARM_STAGE_MATURE = "mature";
-const LAYOUT_SAVE_VERSION = "7";
+const LAYOUT_SAVE_VERSION = "8";
 const STARTING_COINS = 5;
-const DEFAULT_HIDDEN_CELL_KEYS = ["market", "money", "barn", "build"];
+const DEFAULT_HIDDEN_CELL_KEYS = ["market", "sellMarket", "money", "barn", "build"];
 const MILL_WOOD_COST = 15;
 const MILL_NAIL_COST = 5;
 
 const STORAGE_KEYS = {
   farm: "idle-farm-farm-cell-position",
   market: "idle-farm-market-cell-position",
+  sellMarket: "idle-farm-sell-market-cell-position",
   money: "idle-farm-money-cell-position",
   barn: "idle-farm-barn-cell-position",
   menu: "idle-farm-menu-cell-position",
@@ -42,6 +43,7 @@ const STORAGE_KEYS = {
 const DEFAULT_CELL_POSITIONS = {
   farm: readCellPosition("farm", { left: 48, top: 48 }),
   market: readCellPosition("market", { left: 144, top: 48 }),
+  sellMarket: readCellPosition("sellMarket", { left: 480, top: 48 }),
   money: readCellPosition("money", { left: 48, top: 160 }),
   barn: readCellPosition("barn", { left: 320, top: 48 }),
   menu: readCellPosition("menu", { left: 48, top: 240 }),
@@ -186,6 +188,7 @@ function getStarterLayoutPositions() {
   const gap = 16;
   const barnSize = getCellSize("barn");
   const marketSize = getCellSize("market");
+  const sellMarketSize = getCellSize("sellMarket");
   const moneySize = getCellSize("money");
   const menuSize = getCellSize("menu");
   const buildSize = getCellSize("build");
@@ -203,10 +206,12 @@ function getStarterLayoutPositions() {
     Math.max(16, toolsLeft),
     Math.max(16, workspace.width - Math.max(buildSize.width, moneySize.width, millSize.width) - 16)
   );
+  const popupLeftLeft = Math.max(16, Math.min(menuLeft - sellMarketSize.width - gap, workspace.width - sellMarketSize.width - 16));
 
   return {
     barn: { left: menuLeft, top: popupBottomTop },
     market: { left: menuLeft, top: popupTop },
+    sellMarket: { left: popupLeftLeft, top: popupTop },
     money: { left: popupRightLeft, top: popupBottomTop },
     menu: { left: menuLeft, top: menuTop },
     build: { left: popupRightLeft, top: popupTop },
@@ -386,6 +391,7 @@ export const state = {
   cells: {
     farm: DEFAULT_CELL_POSITIONS.farm,
     market: DEFAULT_CELL_POSITIONS.market,
+    sellMarket: DEFAULT_CELL_POSITIONS.sellMarket,
     money: DEFAULT_CELL_POSITIONS.money,
     barn: DEFAULT_CELL_POSITIONS.barn,
     menu: DEFAULT_CELL_POSITIONS.menu,
@@ -485,6 +491,7 @@ export function applyStarterLayout(force = false) {
 
   const layout = getStarterLayoutPositions();
   state.cells.market = layout.market;
+  state.cells.sellMarket = layout.sellMarket;
   state.cells.money = layout.money;
   state.cells.barn = layout.barn;
   state.cells.menu = layout.menu;
@@ -492,6 +499,7 @@ export function applyStarterLayout(force = false) {
   state.cells.mill = layout.mill;
   state.cells.tools = layout.tools;
   saveCellPosition("market", state.cells.market);
+  saveCellPosition("sellMarket", state.cells.sellMarket);
   saveCellPosition("money", state.cells.money);
   saveCellPosition("barn", state.cells.barn);
   saveCellPosition("menu", state.cells.menu);
@@ -909,7 +917,6 @@ export function harvestPlot(plotId) {
   const cropProduct = getProduct(plot.cropId);
   const harvestProductId = cropProduct?.cropProductId || plot.cropId;
   addBarnItem(harvestProductId, 1);
-  addCoins(2);
   plot.cropId = null;
   plot.stage = FARM_STAGE_EMPTY;
   plot.growCompleteAt = null;
@@ -1029,6 +1036,7 @@ export function restartFarm() {
   state.cells.farm = { left: 48, top: 48 };
   const starterLayout = getStarterLayoutPositions();
   state.cells.market = starterLayout.market;
+  state.cells.sellMarket = starterLayout.sellMarket;
   state.cells.money = starterLayout.money;
   state.cells.barn = starterLayout.barn;
   state.cells.menu = starterLayout.menu;
@@ -1037,6 +1045,7 @@ export function restartFarm() {
   state.cells.tools = starterLayout.tools;
   saveCellPosition("farm", state.cells.farm);
   saveCellPosition("market", state.cells.market);
+  saveCellPosition("sellMarket", state.cells.sellMarket);
   saveCellPosition("money", state.cells.money);
   saveCellPosition("barn", state.cells.barn);
   saveCellPosition("menu", state.cells.menu);
