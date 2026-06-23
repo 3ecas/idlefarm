@@ -16,6 +16,7 @@ export const CROPS = {
     marketName: "Wheat",
     inventoryName: "Wheat",
     price: 0,
+    sellPrice: 2,
   },
 };
 

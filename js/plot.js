@@ -68,6 +68,10 @@ export function mountPlot(container) {
       return;
     }
 
+    if (selectedTool === "hand") {
+      return;
+    }
+
     plantSelectedSeedOnPlot(plotId);
   });
 

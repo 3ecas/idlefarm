@@ -12,6 +12,12 @@ function clampToWorkspace(workspace, left, top) {
   };
 }
 
+const TOOL_LABELS = {
+  hand: "Hand (H)",
+  water: "Water (W)",
+  harvest: "Cut / harvest (C)",
+};
+
 function renderToolButton(toolId, label) {
   return `
     <button
@@ -19,6 +25,8 @@ function renderToolButton(toolId, label) {
       class="tool-button ${isToolActive(toolId) ? "is-selected" : ""}"
       data-tool-button="${toolId}"
       aria-pressed="${isToolActive(toolId) ? "true" : "false"}"
+      aria-label="${TOOL_LABELS[toolId]}"
+      title="${TOOL_LABELS[toolId]}"
     >
       ${label}
     </button>
@@ -29,6 +37,7 @@ export function mountTools(container) {
   mountMovableCell(container, {
     key: "tools",
     selector: "[data-tools-cell]",
+    dragHandle: ".tools-header",
     onDrop: (_dragSnapshot, finalPosition) => {
       moveCell("tools", finalPosition.left, finalPosition.top);
       return true;
@@ -46,6 +55,8 @@ export function mountTools(container) {
   });
 
   function render() {
+    document.body.classList.toggle("is-hand-tool-active", isToolActive("hand"));
+
     if (isCellHidden("tools")) {
       container.innerHTML = "";
       return;
@@ -63,6 +74,7 @@ export function mountTools(container) {
           <span class="tools-title">Tools</span>
         </div>
         <div class="tools-body">
+          ${renderToolButton("hand", "✋")}
           ${renderToolButton("water", "💧")}
           ${renderToolButton("harvest", "✂")}
         </div>

@@ -1,7 +1,8 @@
 import { getProduct } from "./catalog.js";
-import { getCellDragBounds, isCellHidden, moveCell, onStateChange, plantSeedFromInventoryOnPlot, state, setMessage } from "./state.js";
+import { getCellDragBounds, hideCell, isCellHidden, moveCell, onStateChange, plantSeedFromInventoryOnPlot, state, setMessage } from "./state.js";
 import { getInventoryEntries, handleInventorySelection, isSelectedInventoryItem } from "./inventory.js";
 import { mountMovableCell } from "./drag.js";
+import { addProductToSellStand, getSellCellFromPoint } from "./sell.js";
 
 const DRAG_THRESHOLD = 4;
 const DRAG_SUPPRESS_MS = 300;
@@ -20,6 +21,12 @@ function clampToWorkspace(workspace, left, top) {
 let barnOpen = false;
 let activeSeedDrag = null;
 const recentlyDraggedSeedIds = new Map();
+const BARN_SECTIONS = [
+  { key: "seeds", label: "Seeds", categories: ["seeds"] },
+  { key: "crops", label: "Crops", categories: ["crops"] },
+  { key: "materials", label: "Materials", categories: ["materials"] },
+  { key: "products", label: "Products", categories: ["processed"] },
+];
 
 function markRecentlyDraggedSeed(productId) {
   recentlyDraggedSeedIds.set(productId, Date.now());
@@ -68,6 +75,7 @@ function clearSeedDrag() {
 
 function createSeedDragGhost(button, left, top) {
   const ghost = button.cloneNode(true);
+  ghost.classList.remove("is-dragging", "is-selected");
   ghost.classList.add("inventory-item--ghost");
   ghost.setAttribute("aria-hidden", "true");
   ghost.tabIndex = -1;
@@ -89,10 +97,70 @@ function getFarmCellFromPoint(x, y) {
   return element?.closest?.("[data-farm-cell]") || null;
 }
 
+function isSellableProduct(product) {
+  return product.category === "crops" || product.category === "processed";
+}
+
+function renderInventoryItem(product, quantity) {
+  if (product.category === "seeds") {
+    return `
+      <button
+        type="button"
+        class="inventory-item ${isSelectedInventoryItem(product.id) ? "is-selected" : ""}"
+        data-inventory-product="${product.id}"
+        draggable="false"
+        data-seed-button
+      >
+        <span class="inventory-item__name">${product.inventoryName}</span>
+        <span class="inventory-item__count">x${quantity}</span>
+      </button>
+    `;
+  }
+
+  if (isSellableProduct(product)) {
+    return `
+      <button
+        type="button"
+        class="inventory-item"
+        data-inventory-product="${product.id}"
+        data-sell-product="${product.id}"
+        draggable="false"
+      >
+        <span class="inventory-item__name">${product.inventoryName}</span>
+        <span class="inventory-item__count">x${quantity}</span>
+      </button>
+    `;
+  }
+
+  return `
+    <div class="inventory-item inventory-item--static">
+      <span class="inventory-item__name">${product.inventoryName}</span>
+      <span class="inventory-item__count">x${quantity}</span>
+    </div>
+  `;
+}
+
+function renderBarnSection(section, entries) {
+  const sectionEntries = entries.filter(({ product }) => section.categories.includes(product.category));
+  return `
+    <details class="barn-section barn-section--${section.key}" open>
+      <summary>${section.label}</summary>
+      <div class="barn-section__body">
+        ${
+          sectionEntries.length > 0
+            ? sectionEntries.map(({ product, quantity }) => renderInventoryItem(product, quantity)).join("")
+            : `<div class="inventory-item inventory-item--empty">Empty</div>`
+        }
+      </div>
+    </details>
+  `;
+}
+
 export function mountBarn(container) {
   mountMovableCell(container, {
     key: "barn",
     selector: "[data-barn-cell]",
+    dragHandle: ".barn-header",
     onDrop: (_dragSnapshot, finalPosition) => {
       moveCell("barn", finalPosition.left, finalPosition.top);
       return true;
@@ -100,6 +168,14 @@ export function mountBarn(container) {
   });
 
   container.addEventListener("click", (event) => {
+    const closeButton = event.target.closest("[data-close-cell]");
+    if (closeButton) {
+      event.preventDefault();
+      hideCell("barn");
+      setMessage("Barn closed.");
+      return;
+    }
+
     const inventoryButton = event.target.closest("[data-inventory-product]");
     if (inventoryButton) {
       event.preventDefault();
@@ -129,12 +205,13 @@ export function mountBarn(container) {
 
     const productId = inventoryButton.dataset.inventoryProduct;
     const product = getProduct(productId);
-    if (!product || product.category !== "seeds") {
+    if (!product || (product.category !== "seeds" && !isSellableProduct(product))) {
       return;
     }
 
     activeSeedDrag = {
       productId,
+      target: product.category === "seeds" ? "farm" : "sell",
       button: inventoryButton,
       pointerId: event.pointerId,
       startX: event.clientX,
@@ -144,6 +221,8 @@ export function mountBarn(container) {
       ghost: null,
       dragged: false,
     };
+
+    event.preventDefault();
 
     try {
       inventoryButton.setPointerCapture(event.pointerId);
@@ -166,13 +245,16 @@ export function mountBarn(container) {
 
     if (!activeSeedDrag.dragged) {
       activeSeedDrag.dragged = true;
-      activeSeedDrag.button.classList.add("is-dragging");
-      document.body.classList.add("is-dragging-cell");
+      if (activeSeedDrag.ghost) {
+        activeSeedDrag.ghost.remove();
+      }
       activeSeedDrag.ghost = createSeedDragGhost(
         activeSeedDrag.button,
         activeSeedDrag.startLeft,
         activeSeedDrag.startTop
       );
+      activeSeedDrag.button.classList.add("is-dragging");
+      document.body.classList.add("is-dragging-cell");
     }
 
     if (activeSeedDrag.ghost) {
@@ -198,9 +280,16 @@ export function mountBarn(container) {
 
     markRecentlyDraggedSeed(snapshot.productId);
 
-    const farmCell = getFarmCellFromPoint(event.clientX, event.clientY);
-    if (farmCell) {
-      plantSeedFromInventoryOnPlot(farmCell.dataset.cellKey, snapshot.productId);
+    if (snapshot.target === "farm") {
+      const farmCell = getFarmCellFromPoint(event.clientX, event.clientY);
+      if (farmCell) {
+        plantSeedFromInventoryOnPlot(farmCell.dataset.cellKey, snapshot.productId);
+      }
+    } else {
+      const sellCell = getSellCellFromPoint(event.clientX, event.clientY);
+      if (sellCell) {
+        addProductToSellStand(snapshot.productId);
+      }
     }
 
     event.preventDefault();
@@ -227,40 +316,13 @@ export function mountBarn(container) {
       <section class="barn-cell ${barnOpen ? "is-open" : "is-closed"}" data-cell-key="barn" data-barn-cell style="left:${position.left}px; top:${position.top}px;" aria-label="Barn">
         <div class="barn-header">
           <span class="barn-title">Barn</span>
-          <button type="button" class="barn-toggle" data-barn-toggle>${barnOpen ? "Hide" : "Show"}</button>
+          <div class="cell-header-actions">
+            <button type="button" class="barn-toggle" data-barn-toggle>${barnOpen ? "Hide" : "Show"}</button>
+            <button type="button" class="cell-close" data-close-cell aria-label="Close Barn">x</button>
+          </div>
         </div>
         <div class="barn-body ${barnOpen ? "" : "is-hidden"}">
-          ${
-            entries.length > 0
-              ? entries
-                  .map(
-                    ({ product, quantity }) => `
-                      ${
-                        product.category === "seeds"
-                          ? `
-                            <button
-                              type="button"
-                              class="inventory-item ${isSelectedInventoryItem(product.id) ? "is-selected" : ""}"
-                              data-inventory-product="${product.id}"
-                              draggable="false"
-                              data-seed-button
-                            >
-                              <span class="inventory-item__name">${product.inventoryName}</span>
-                              <span class="inventory-item__count">x${quantity}</span>
-                            </button>
-                          `
-                          : `
-                            <div class="inventory-item inventory-item--static">
-                              <span class="inventory-item__name">${product.inventoryName}</span>
-                              <span class="inventory-item__count">x${quantity}</span>
-                            </div>
-                          `
-                      }
-                    `
-                  )
-                  .join("")
-              : `<div class="inventory-item inventory-item--empty">Empty</div>`
-          }
+          ${BARN_SECTIONS.map((section) => renderBarnSection(section, entries)).join("")}
         </div>
       </section>
     `;

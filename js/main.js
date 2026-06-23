@@ -1,12 +1,15 @@
 import { mountBarn } from "./barn.js";
+import { mountBuild } from "./build.js";
 import { mountMarket } from "./market.js";
+import { mountMenu } from "./menu.js";
+import { mountMill } from "./mill.js";
 import { mountMoney } from "./money.js";
 import { mountPlot } from "./plot.js";
 import { mountShopping } from "./shopping.js";
 import { mountTools } from "./tools.js";
 import { getCellSize } from "./layout.js";
 import { clearSelectedInventoryItem } from "./inventory.js";
-import { applyStarterLayout, clearActiveTool, isCellHidden, moveCell, onStateChange, restartFarm, state } from "./state.js";
+import { applyStarterLayout, clearActiveTool, isCellHidden, isToolActive, moveCell, onStateChange, restartFarm, setActiveTool, state } from "./state.js";
 
 const statusRoot = document.getElementById("status");
 const cellMount = document.getElementById("cell-mount");
@@ -14,6 +17,9 @@ const marketMount = document.getElementById("market-mount");
 const moneyMount = document.getElementById("money-mount");
 const shoppingMount = document.getElementById("shopping-mount");
 const barnMount = document.getElementById("barn-mount");
+const buildMount = document.getElementById("build-mount");
+const millMount = document.getElementById("mill-mount");
+const menuMount = document.getElementById("menu-mount");
 const toolsMount = document.getElementById("tools-mount");
 const restartButton = document.querySelector("[data-restart-farm]");
 
@@ -26,6 +32,9 @@ mountMarket(marketMount);
 mountMoney(moneyMount);
 mountShopping(shoppingMount);
 mountBarn(barnMount);
+mountBuild(buildMount);
+mountMill(millMount);
+mountMenu(menuMount);
 mountTools(toolsMount);
 onStateChange(renderStatus);
 renderStatus();
@@ -39,8 +48,38 @@ document.addEventListener("pointerdown", (event) => {
     return;
   }
 
+  if (isToolActive("hand")) {
+    event.preventDefault();
+    window.getSelection()?.removeAllRanges();
+    return;
+  }
+
   clearActiveTool();
   clearSelectedInventoryItem();
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.metaKey || event.ctrlKey || event.altKey) {
+    return;
+  }
+
+  const interactiveElement = event.target.closest?.("input, textarea, select, [contenteditable='true']");
+  if (interactiveElement) {
+    return;
+  }
+
+  const shortcutTools = {
+    h: "hand",
+    w: "water",
+    c: "harvest",
+  };
+  const toolId = shortcutTools[event.key.toLowerCase()];
+  if (!toolId) {
+    return;
+  }
+
+  event.preventDefault();
+  setActiveTool(toolId);
 });
 
 if (restartButton) {
@@ -59,21 +98,26 @@ function refreshLayout() {
   if (workspace.clientWidth < 720) {
     const left = 16;
     const gap = 12;
-    if (!isCellHidden("barn")) {
-      moveCell("barn", left, 16);
+    let top = 16;
+
+    if (!isCellHidden("menu")) {
+      moveCell("menu", left, top);
+      top += getCellSize("menu").height + gap;
     }
 
-    const barnElement = isCellHidden("barn") ? null : document.querySelector("[data-barn-cell]");
-    const marketElement = isCellHidden("market") ? null : document.querySelector("[data-market-cell]");
-    const shoppingElement = isCellHidden("shopping") ? null : document.querySelector("[data-shopping-cell]");
-    const barnBottom = barnElement ? barnElement.offsetTop + barnElement.offsetHeight : 16;
-    const marketBottom = marketElement ? marketElement.offsetTop + marketElement.offsetHeight : barnBottom;
-    const shoppingBottom = shoppingElement ? shoppingElement.offsetTop + shoppingElement.offsetHeight : marketBottom;
-    let top = Math.max(barnBottom, marketBottom, shoppingBottom) + gap;
+    if (!isCellHidden("tools")) {
+      moveCell("tools", left, top);
+      top += getCellSize("tools").height + gap;
+    }
 
     if (!isCellHidden("market")) {
       moveCell("market", left, top);
       top += getCellSize("market").height + gap;
+    }
+
+    if (!isCellHidden("build")) {
+      moveCell("build", left, top);
+      top += getCellSize("build").height + gap;
     }
 
     if (!isCellHidden("money")) {
@@ -81,19 +125,29 @@ function refreshLayout() {
       top += getCellSize("money").height + gap;
     }
 
-    if (!isCellHidden("tools")) {
-      moveCell("tools", left, top);
+    if (!isCellHidden("barn")) {
+      moveCell("barn", left, top);
+      top += getCellSize("barn").height + gap;
+    }
+
+    if (state.buildings.mill) {
+      moveCell("mill", left, top);
     }
     return;
   }
 
-  for (const key of ["market", "money", "barn", "tools"]) {
+  for (const key of ["market", "money", "barn", "build", "menu", "tools"]) {
     if (isCellHidden(key)) {
       continue;
     }
 
     const position = state.cells[key];
     moveCell(key, position.left, position.top);
+  }
+
+  if (state.buildings.mill) {
+    const position = state.cells.mill;
+    moveCell("mill", position.left, position.top);
   }
 }
 

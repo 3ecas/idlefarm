@@ -1,4 +1,4 @@
-import { getProduct } from "./catalog.js";
+import { getProduct, getProductSellPrice } from "./catalog.js";
 import { getCellSize } from "./layout.js";
 
 const listeners = new Set();
@@ -16,14 +16,21 @@ const FARM_STAGE_EMPTY = "empty";
 const FARM_STAGE_PLANTED = "planted";
 const FARM_STAGE_GROWING = "growing";
 const FARM_STAGE_MATURE = "mature";
-const LAYOUT_SAVE_VERSION = "2";
+const LAYOUT_SAVE_VERSION = "7";
 const STARTING_COINS = 5;
+const DEFAULT_HIDDEN_CELL_KEYS = ["market", "money", "barn", "build"];
+const MILL_WOOD_COST = 15;
+const MILL_NAIL_COST = 5;
 
 const STORAGE_KEYS = {
   farm: "idle-farm-farm-cell-position",
   market: "idle-farm-market-cell-position",
   money: "idle-farm-money-cell-position",
   barn: "idle-farm-barn-cell-position",
+  menu: "idle-farm-menu-cell-position",
+  build: "idle-farm-build-cell-position",
+  mill: "idle-farm-mill-cell-position",
+  millBuilt: "idle-farm-mill-built",
   tools: "idle-farm-tools-cell-position",
   farmPlots: "idle-farm-farm-plots",
   hiddenCells: "idle-farm-hidden-cells",
@@ -37,6 +44,9 @@ const DEFAULT_CELL_POSITIONS = {
   market: readCellPosition("market", { left: 144, top: 48 }),
   money: readCellPosition("money", { left: 48, top: 160 }),
   barn: readCellPosition("barn", { left: 320, top: 48 }),
+  menu: readCellPosition("menu", { left: 48, top: 240 }),
+  build: readCellPosition("build", { left: 48, top: 328 }),
+  mill: readCellPosition("mill", { left: 248, top: 328 }),
   tools: readCellPosition("tools", { left: 48, top: 240 }),
 };
 
@@ -101,12 +111,17 @@ function saveFlag(key, value) {
   }
 }
 
-function readStringArray(key) {
+function readStringArray(key, fallback = []) {
   try {
-    const parsed = JSON.parse(localStorage.getItem(STORAGE_KEYS[key]) || "[]");
-    return Array.isArray(parsed) ? parsed.filter((value) => typeof value === "string") : [];
+    const storedValue = localStorage.getItem(STORAGE_KEYS[key]);
+    if (storedValue === null) {
+      return [...fallback];
+    }
+
+    const parsed = JSON.parse(storedValue);
+    return Array.isArray(parsed) ? parsed.filter((value) => typeof value === "string") : [...fallback];
   } catch {
-    return [];
+    return [...fallback];
   }
 }
 
@@ -172,18 +187,31 @@ function getStarterLayoutPositions() {
   const barnSize = getCellSize("barn");
   const marketSize = getCellSize("market");
   const moneySize = getCellSize("money");
+  const menuSize = getCellSize("menu");
+  const buildSize = getCellSize("build");
+  const millSize = getCellSize("mill");
   const toolsSize = getCellSize("tools");
-  const totalWidth = barnSize.width + gap + marketSize.width + gap + moneySize.width;
-  const rowHeight = Math.max(barnSize.height, marketSize.height, moneySize.height);
-  const startLeft = Math.max(16, Math.round((workspace.width - totalWidth) / 2));
-  const top = Math.max(16, Math.round((workspace.height - rowHeight) / 2));
-  const toolsTop = Math.min(workspace.height - toolsSize.height - 16, top + rowHeight + gap);
+  const menuLeft = Math.max(16, Math.round((workspace.width - menuSize.width) / 2));
+  const toolsLeft = Math.max(16, Math.round((workspace.width - toolsSize.width) / 2));
+  const desiredMenuTop = Math.round((workspace.height * 2) / 3 - menuSize.height / 2);
+  const maxMenuTop = Math.max(16, workspace.height - menuSize.height - toolsSize.height - gap - 16);
+  const menuTop = Math.max(16, Math.min(desiredMenuTop, maxMenuTop));
+  const toolsTop = menuTop + menuSize.height + gap;
+  const popupTop = Math.max(16, menuTop - Math.max(marketSize.height, barnSize.height) - gap);
+  const popupBottomTop = Math.min(workspace.height - moneySize.height - 16, toolsTop + toolsSize.height + gap);
+  const popupRightLeft = Math.min(
+    Math.max(16, toolsLeft),
+    Math.max(16, workspace.width - Math.max(buildSize.width, moneySize.width, millSize.width) - 16)
+  );
 
   return {
-    barn: { left: startLeft, top },
-    market: { left: startLeft + barnSize.width + gap, top },
-    money: { left: startLeft + barnSize.width + gap + marketSize.width + gap, top },
-    tools: { left: startLeft, top: Math.max(16, toolsTop) },
+    barn: { left: menuLeft, top: popupBottomTop },
+    market: { left: menuLeft, top: popupTop },
+    money: { left: popupRightLeft, top: popupBottomTop },
+    menu: { left: menuLeft, top: menuTop },
+    build: { left: popupRightLeft, top: popupTop },
+    mill: { left: popupRightLeft, top: Math.min(workspace.height - millSize.height - 16, popupBottomTop + buildSize.height + gap) },
+    tools: { left: toolsLeft, top: toolsTop },
   };
 }
 
@@ -205,22 +233,22 @@ function getObstacleRects(excludePlotId = null) {
 
   return [
     {
-      left: DEFAULT_CELL_POSITIONS.market.left,
-      top: DEFAULT_CELL_POSITIONS.market.top,
-      width: getCellSize("market").width,
-      height: getCellSize("market").height,
+      left: DEFAULT_CELL_POSITIONS.menu.left,
+      top: DEFAULT_CELL_POSITIONS.menu.top,
+      width: getCellSize("menu").width,
+      height: getCellSize("menu").height,
     },
     {
-      left: DEFAULT_CELL_POSITIONS.money.left,
-      top: DEFAULT_CELL_POSITIONS.money.top,
-      width: getCellSize("money").width,
-      height: getCellSize("money").height,
+      left: DEFAULT_CELL_POSITIONS.tools.left,
+      top: DEFAULT_CELL_POSITIONS.tools.top,
+      width: getCellSize("tools").width,
+      height: getCellSize("tools").height,
     },
     {
-      left: DEFAULT_CELL_POSITIONS.barn.left,
-      top: DEFAULT_CELL_POSITIONS.barn.top,
-      width: getCellSize("barn").width,
-      height: getCellSize("barn").height,
+      left: DEFAULT_CELL_POSITIONS.mill.left,
+      top: DEFAULT_CELL_POSITIONS.mill.top,
+      width: getCellSize("mill").width,
+      height: getCellSize("mill").height,
     },
   ];
 }
@@ -360,6 +388,9 @@ export const state = {
     market: DEFAULT_CELL_POSITIONS.market,
     money: DEFAULT_CELL_POSITIONS.money,
     barn: DEFAULT_CELL_POSITIONS.barn,
+    menu: DEFAULT_CELL_POSITIONS.menu,
+    build: DEFAULT_CELL_POSITIONS.build,
+    mill: DEFAULT_CELL_POSITIONS.mill,
     tools: DEFAULT_CELL_POSITIONS.tools,
   },
   farm: {
@@ -367,7 +398,7 @@ export const state = {
     enteringPlotIds: [],
   },
   ui: {
-    hiddenCellKeys: readStringArray("hiddenCells"),
+    hiddenCellKeys: readStringArray("hiddenCells", DEFAULT_HIDDEN_CELL_KEYS),
     activeTool: null,
   },
   inventory: {
@@ -376,8 +407,14 @@ export const state = {
   shopping: {
     items: {},
   },
+  sell: {
+    items: {},
+  },
   barn: {
     items: {},
+  },
+  buildings: {
+    mill: readFlag("millBuilt", false),
   },
   message: "Drag the cell.",
 };
@@ -450,11 +487,21 @@ export function applyStarterLayout(force = false) {
   state.cells.market = layout.market;
   state.cells.money = layout.money;
   state.cells.barn = layout.barn;
+  state.cells.menu = layout.menu;
+  state.cells.build = layout.build;
+  state.cells.mill = layout.mill;
   state.cells.tools = layout.tools;
   saveCellPosition("market", state.cells.market);
   saveCellPosition("money", state.cells.money);
   saveCellPosition("barn", state.cells.barn);
+  saveCellPosition("menu", state.cells.menu);
+  saveCellPosition("build", state.cells.build);
+  saveCellPosition("mill", state.cells.mill);
   saveCellPosition("tools", state.cells.tools);
+  if (!force && storedLayoutVersion !== LAYOUT_SAVE_VERSION) {
+    state.ui.hiddenCellKeys = Array.from(new Set([...state.ui.hiddenCellKeys, ...DEFAULT_HIDDEN_CELL_KEYS]));
+    saveStringArray("hiddenCells", state.ui.hiddenCellKeys);
+  }
   saveFlag("layoutInitialized", true);
   try {
     localStorage.setItem(STORAGE_KEYS.layoutVersion, LAYOUT_SAVE_VERSION);
@@ -557,7 +604,13 @@ function saveFarmState() {
 
 export function setActiveTool(toolId) {
   state.ui.activeTool = toolId;
-  state.message = toolId === "water" ? "Water tool selected." : "Harvest tool selected.";
+  state.inventory.selectedItemId = null;
+  const toolMessages = {
+    hand: "Hand tool selected.",
+    water: "Water tool selected.",
+    harvest: "Harvest tool selected.",
+  };
+  state.message = toolMessages[toolId] || "Tool selected.";
   notify();
 }
 
@@ -607,6 +660,10 @@ export function getBarnItemQuantity(productId) {
   return state.barn.items[productId] || 0;
 }
 
+export function isBuildingBuilt(buildingId) {
+  return Boolean(state.buildings[buildingId]);
+}
+
 export function addBarnItem(productId, quantity = 1) {
   if (quantity <= 0) {
     return false;
@@ -634,6 +691,153 @@ export function consumeBarnItem(productId, quantity = 1) {
     state.inventory.selectedItemId = null;
   }
 
+  notify();
+  return true;
+}
+
+export function isProductSellable(productId) {
+  const product = getProduct(productId);
+  return Boolean(product && (product.category === "crops" || product.category === "processed"));
+}
+
+export function getSellItemQuantity(productId) {
+  return state.sell.items[productId] || 0;
+}
+
+export function getSellEntries() {
+  return Object.entries(state.sell.items)
+    .map(([productId, quantity]) => {
+      const product = getProduct(productId);
+      return product && quantity > 0 ? { product, quantity } : null;
+    })
+    .filter(Boolean);
+}
+
+export function getSellTotal() {
+  return getSellEntries().reduce((total, { product, quantity }) => {
+    return total + getProductSellPrice(product.id) * quantity;
+  }, 0);
+}
+
+export function addSellItem(productId, quantity = 1) {
+  if (!isProductSellable(productId)) {
+    state.message = "Only crops and products can be sold.";
+    notify();
+    return false;
+  }
+
+  const ownedQuantity = getBarnItemQuantity(productId);
+  if (ownedQuantity <= 0) {
+    state.message = "None available.";
+    notify();
+    return false;
+  }
+
+  const currentQuantity = getSellItemQuantity(productId);
+  const nextQuantity = Math.min(ownedQuantity, currentQuantity + quantity);
+  state.sell.items[productId] = nextQuantity;
+  state.message = "Added to sell list.";
+  notify();
+  return true;
+}
+
+export function adjustSellItem(productId, delta) {
+  const currentQuantity = getSellItemQuantity(productId);
+  if (!currentQuantity) {
+    return false;
+  }
+
+  const ownedQuantity = getBarnItemQuantity(productId);
+  const nextQuantity = Math.max(0, Math.min(ownedQuantity, currentQuantity + delta));
+  if (nextQuantity > 0) {
+    state.sell.items[productId] = nextQuantity;
+  } else {
+    delete state.sell.items[productId];
+  }
+  notify();
+  return true;
+}
+
+export function removeSellItem(productId) {
+  if (!state.sell.items[productId]) {
+    return false;
+  }
+
+  delete state.sell.items[productId];
+  state.message = "Removed.";
+  notify();
+  return true;
+}
+
+export function sellQueuedItems() {
+  const entries = getSellEntries();
+  if (entries.length === 0) {
+    state.message = "Nothing to sell.";
+    notify();
+    return false;
+  }
+
+  let total = 0;
+  for (const { product, quantity } of entries) {
+    const ownedQuantity = getBarnItemQuantity(product.id);
+    const sellQuantity = Math.min(quantity, ownedQuantity);
+    if (sellQuantity <= 0) {
+      continue;
+    }
+
+    consumeBarnItem(product.id, sellQuantity);
+    total += getProductSellPrice(product.id) * sellQuantity;
+  }
+
+  state.sell.items = {};
+  state.coins += total;
+  state.message = total > 0 ? `Sold for ${total} coins.` : "Nothing to sell.";
+  notify();
+  return total > 0;
+}
+
+export function canBuildMill() {
+  return getBarnItemQuantity("wood") >= MILL_WOOD_COST && getBarnItemQuantity("nails") >= MILL_NAIL_COST;
+}
+
+export function buildMill() {
+  if (state.buildings.mill) {
+    state.message = "Mill already built.";
+    notify();
+    return false;
+  }
+
+  if (!canBuildMill()) {
+    state.message = `Need ${MILL_WOOD_COST} wood and ${MILL_NAIL_COST} nails.`;
+    notify();
+    return false;
+  }
+
+  consumeBarnItem("wood", MILL_WOOD_COST);
+  consumeBarnItem("nails", MILL_NAIL_COST);
+  state.buildings.mill = true;
+  saveFlag("millBuilt", true);
+  state.message = "Mill built.";
+  notify();
+  return true;
+}
+
+export function millWheatToFlour() {
+  if (!state.buildings.mill) {
+    state.message = "Build a mill first.";
+    notify();
+    return false;
+  }
+
+  if (getBarnItemQuantity("wheatCrop") < 2) {
+    state.message = "Need 2 wheat.";
+    notify();
+    return false;
+  }
+
+  consumeBarnItem("wheatCrop", 2);
+  addBarnItem("flour", 1);
+  state.message = "Flour made.";
   notify();
   return true;
 }
@@ -799,6 +1003,20 @@ export function deleteCellByKey(key) {
     return false;
   }
 
+  if (key === "menu") {
+    state.message = "Menu stays open.";
+    notify();
+    return false;
+  }
+
+  if (key === "mill") {
+    state.buildings.mill = false;
+    saveFlag("millBuilt", false);
+    state.message = "Mill removed.";
+    notify();
+    return true;
+  }
+
   state.ui.hiddenCellKeys.push(key);
   saveStringArray("hiddenCells", state.ui.hiddenCellKeys);
   state.message = "Cell deleted.";
@@ -813,11 +1031,17 @@ export function restartFarm() {
   state.cells.market = starterLayout.market;
   state.cells.money = starterLayout.money;
   state.cells.barn = starterLayout.barn;
+  state.cells.menu = starterLayout.menu;
+  state.cells.build = starterLayout.build;
+  state.cells.mill = starterLayout.mill;
   state.cells.tools = starterLayout.tools;
   saveCellPosition("farm", state.cells.farm);
   saveCellPosition("market", state.cells.market);
   saveCellPosition("money", state.cells.money);
   saveCellPosition("barn", state.cells.barn);
+  saveCellPosition("menu", state.cells.menu);
+  saveCellPosition("build", state.cells.build);
+  saveCellPosition("mill", state.cells.mill);
   saveCellPosition("tools", state.cells.tools);
   state.farm.plots = [];
   state.farm.enteringPlotIds = [];
@@ -832,10 +1056,13 @@ export function restartFarm() {
   saveFarmPlots(state.farm.plots);
   state.barn.items = {};
   state.shopping.items = {};
-  state.ui.hiddenCellKeys = [];
+  state.sell.items = {};
+  state.buildings.mill = false;
+  state.ui.hiddenCellKeys = [...DEFAULT_HIDDEN_CELL_KEYS];
   state.ui.activeTool = null;
   state.inventory.selectedItemId = null;
   saveStringArray("hiddenCells", state.ui.hiddenCellKeys);
+  saveFlag("millBuilt", false);
   saveFlag("layoutInitialized", true);
   try {
     localStorage.setItem(STORAGE_KEYS.layoutVersion, LAYOUT_SAVE_VERSION);

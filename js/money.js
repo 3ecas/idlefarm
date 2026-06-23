@@ -1,4 +1,4 @@
-import { addCoins, getCellDragBounds, isCellHidden, moveCell, onStateChange, state } from "./state.js";
+import { addCoins, getCellDragBounds, hideCell, isCellHidden, moveCell, onStateChange, setMessage, state } from "./state.js";
 import { mountMovableCell } from "./drag.js";
 
 function clampToWorkspace(workspace, left, top) {
@@ -16,6 +16,7 @@ export function mountMoney(container) {
   mountMovableCell(container, {
     key: "money",
     selector: "[data-money-cell]",
+    dragHandle: ".money-header",
     onDrop: (_dragSnapshot, finalPosition) => {
       moveCell("money", finalPosition.left, finalPosition.top);
       return true;
@@ -23,6 +24,14 @@ export function mountMoney(container) {
   });
 
   container.addEventListener("click", (event) => {
+    const closeButton = event.target.closest("[data-close-cell]");
+    if (closeButton) {
+      event.preventDefault();
+      hideCell("money");
+      setMessage("Money closed.");
+      return;
+    }
+
     const addButton = event.target.closest("[data-add-coins]");
     if (!addButton) {
       return;
@@ -47,6 +56,7 @@ export function mountMoney(container) {
       <section class="money-cell" data-cell-key="money" data-money-cell style="left:${position.left}px; top:${position.top}px;" aria-label="Money">
         <div class="money-header">
           <span class="money-title">Money</span>
+          <button type="button" class="cell-close" data-close-cell aria-label="Close Money">x</button>
         </div>
         <div class="money-body">
           <span class="money-coin" aria-hidden="true"></span>

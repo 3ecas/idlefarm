@@ -2,7 +2,7 @@ import { deleteCellByKey, moveCell, moveFarmPlot, state } from "./state.js";
 
 const GRID_SIZE = 24;
 const DRAG_THRESHOLD = 4;
-const OVERLAP_PADDING = 1;
+const EDGE_SNAP_DISTANCE = 14;
 
 let dragState = null;
 const recentDraggedKeys = new Map();
@@ -43,6 +43,30 @@ function clampToWorkspace(workspace, left, top, width, height) {
 
 function snapToGrid(value) {
   return Math.round(value / GRID_SIZE) * GRID_SIZE;
+}
+
+function getElementOffset(element, axis) {
+  const offsetKey = axis === "left" ? "offsetLeft" : "offsetTop";
+  const styleValue = Number.parseFloat(element.style[axis]);
+  if (Number.isFinite(styleValue)) {
+    return styleValue;
+  }
+
+  const offsetValue = element[offsetKey];
+  return Number.isFinite(offsetValue) ? offsetValue : 0;
+}
+
+function getWorkspaceRect(workspace, element) {
+  const workspaceRect = workspace.getBoundingClientRect();
+  const rect = element.getBoundingClientRect();
+  return {
+    left: rect.left - workspaceRect.left,
+    top: rect.top - workspaceRect.top,
+    right: rect.right - workspaceRect.left,
+    bottom: rect.bottom - workspaceRect.top,
+    width: rect.width,
+    height: rect.height,
+  };
 }
 
 function isFarmPlotKey(key) {
@@ -90,34 +114,53 @@ function isInsideDeleteZone(workspace, left, top, width, height) {
   return overlaps(cellRect.left, cellRect.top, width, height, rect, 0);
 }
 
-function resolveNonOverlapPosition(key, workspace, left, top, width, height, deltaX, deltaY) {
-  let candidateLeft = left;
-  let candidateTop = top;
-  const otherCells = Array.from(document.querySelectorAll("[data-cell-key]")).filter(
-    (element) => element.dataset.cellKey !== key
-  );
+function findNearestSnap(rawValue, candidates) {
+  let nearest = null;
 
-  for (let iteration = 0; iteration < 12; iteration += 1) {
-    const collision = otherCells.find((element) => {
-      return overlaps(candidateLeft, candidateTop, width, height, element.getBoundingClientRect(), OVERLAP_PADDING);
-    });
-    if (!collision) {
-      return clampToWorkspace(workspace, candidateLeft, candidateTop, width, height);
+  for (const candidate of candidates) {
+    const distance = Math.abs(rawValue - candidate);
+    if (distance > EDGE_SNAP_DISTANCE) {
+      continue;
     }
 
-    const rect = collision.getBoundingClientRect();
-    if (Math.abs(deltaX) >= Math.abs(deltaY)) {
-      candidateLeft = deltaX >= 0 ? rect.left - width - OVERLAP_PADDING : rect.right + OVERLAP_PADDING;
-    } else {
-      candidateTop = deltaY >= 0 ? rect.top - height - OVERLAP_PADDING : rect.bottom + OVERLAP_PADDING;
+    if (!nearest || distance < nearest.distance) {
+      nearest = { value: candidate, distance };
     }
-
-    const clamped = clampToWorkspace(workspace, candidateLeft, candidateTop, width, height);
-    candidateLeft = clamped.left;
-    candidateTop = clamped.top;
   }
 
-  return clampToWorkspace(workspace, candidateLeft, candidateTop, width, height);
+  return nearest ? nearest.value : null;
+}
+
+function getSettledPosition(key, workspace, rawLeft, rawTop, width, height) {
+  const rawPosition = clampToWorkspace(workspace, rawLeft, rawTop, width, height);
+  const gridPosition = clampToWorkspace(
+    workspace,
+    snapToGrid(rawPosition.left),
+    snapToGrid(rawPosition.top),
+    width,
+    height
+  );
+  const otherRects = Array.from(document.querySelectorAll("[data-cell-key]"))
+    .filter((element) => element.dataset.cellKey !== key)
+    .map((element) => getWorkspaceRect(workspace, element));
+
+  const xCandidates = [];
+  const yCandidates = [];
+  for (const rect of otherRects) {
+    xCandidates.push(rect.left, rect.right, rect.left - width, rect.right - width);
+    yCandidates.push(rect.top, rect.bottom, rect.top - height, rect.bottom - height);
+  }
+
+  const snappedLeft = findNearestSnap(rawPosition.left, xCandidates);
+  const snappedTop = findNearestSnap(rawPosition.top, yCandidates);
+
+  return clampToWorkspace(
+    workspace,
+    snappedLeft ?? gridPosition.left,
+    snappedTop ?? gridPosition.top,
+    width,
+    height
+  );
 }
 
 function endDrag() {
@@ -139,10 +182,14 @@ function endDrag() {
   return snapshot;
 }
 
-export function mountMovableCell(container, { key, selector, onDrop }) {
+export function mountMovableCell(container, { key, selector, dragHandle = null, onDrop }) {
   container.addEventListener("pointerdown", (event) => {
     const cell = event.target.closest(selector);
     if (!cell || event.button !== 0) {
+      return;
+    }
+
+    if (state.ui.activeTool !== "hand") {
       return;
     }
 
@@ -151,21 +198,44 @@ export function mountMovableCell(container, { key, selector, onDrop }) {
       return;
     }
 
+    if (dragHandle) {
+      const handle = event.target.closest(dragHandle);
+      if (!handle || !cell.contains(handle)) {
+        return;
+      }
+    }
+
+    const workspace = container.closest(".workspace");
+    if (!workspace) {
+      return;
+    }
+
+    const startLeft = getElementOffset(cell, "left");
+    const startTop = getElementOffset(cell, "top");
+
+    event.preventDefault();
+
     dragState = {
       key: cell.dataset.cellKey || key,
       cell,
       pointerId: event.pointerId,
       startX: event.clientX,
       startY: event.clientY,
-      startLeft: cell.offsetLeft,
-      startTop: cell.offsetTop,
+      startLeft,
+      startTop,
+      currentLeft: startLeft,
+      currentTop: startTop,
       width: cell.offsetWidth,
       height: cell.offsetHeight,
       moved: false,
-      workspace: container.closest(".workspace"),
+      workspace,
     };
 
-    cell.setPointerCapture(event.pointerId);
+    try {
+      cell.setPointerCapture(event.pointerId);
+    } catch {
+      // Best effort.
+    }
   });
 
   container.addEventListener("pointermove", (event) => {
@@ -190,6 +260,8 @@ export function mountMovableCell(container, { key, selector, onDrop }) {
       dragState.width,
       dragState.height
     );
+    dragState.currentLeft = position.left;
+    dragState.currentTop = position.top;
     dragState.cell.style.left = `${position.left}px`;
     dragState.cell.style.top = `${position.top}px`;
     setDeleteZoneActive(isInsideDeleteZone(dragState.workspace, position.left, position.top, dragState.width, dragState.height));
@@ -213,10 +285,11 @@ export function mountMovableCell(container, { key, selector, onDrop }) {
       return;
     }
 
-    const finalPosition = clampToWorkspace(
+    const finalPosition = getSettledPosition(
+      snapshot.key,
       snapshot.workspace,
-      snapToGrid(snapshot.cell.offsetLeft),
-      snapToGrid(snapshot.cell.offsetTop),
+      snapshot.currentLeft,
+      snapshot.currentTop,
       snapshot.width,
       snapshot.height
     );
@@ -234,19 +307,8 @@ export function mountMovableCell(container, { key, selector, onDrop }) {
       return;
     }
 
-    const resolvedFinalPosition = resolveNonOverlapPosition(
-      snapshot.key,
-      snapshot.workspace,
-      finalPosition.left,
-      finalPosition.top,
-      snapshot.width,
-      snapshot.height,
-      snapshot.cell.offsetLeft - snapshot.startLeft,
-      snapshot.cell.offsetTop - snapshot.startTop
-    );
-
     const settledPosition = snapshot.moved
-      ? resolvedFinalPosition
+      ? finalPosition
       : { left: snapshot.startLeft, top: snapshot.startTop };
 
     if (snapshot.moved) {
