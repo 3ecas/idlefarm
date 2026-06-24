@@ -1,6 +1,7 @@
 import { mountAnimalPen } from "./animalPen.js";
 import { mountBarn } from "./barn.js";
 import { mountBuild } from "./build.js";
+import { mountBakery } from "./bakery.js";
 import { mountMarket } from "./market.js";
 import { mountMenu } from "./menu.js";
 import { mountMill } from "./mill.js";
@@ -24,6 +25,7 @@ const shoppingMount = document.getElementById("shopping-mount");
 const barnMount = document.getElementById("barn-mount");
 const buildMount = document.getElementById("build-mount");
 const millMount = document.getElementById("mill-mount");
+const bakeryMount = document.getElementById("bakery-mount");
 const animalPenMount = document.getElementById("animal-pen-mount");
 const menuMount = document.getElementById("menu-mount");
 const toolsMount = document.getElementById("tools-mount");
@@ -42,6 +44,7 @@ mountShopping(shoppingMount);
 mountBarn(barnMount);
 mountBuild(buildMount);
 mountMill(millMount);
+mountBakery(bakeryMount);
 mountAnimalPen(animalPenMount);
 mountMenu(menuMount);
 mountTools(toolsMount);
@@ -55,23 +58,29 @@ window.requestAnimationFrame(() => {
   refreshLayout();
 });
 
-document.addEventListener("pointerdown", (event) => {
+function clearInteractionFromEmptySpace(event) {
   const interactiveElement = event.target.closest(
     "[data-cell-key], [data-delete-zone], [data-restart-farm], button, summary, input, textarea, select, a, label"
   );
   if (interactiveElement) {
-    return;
+    return false;
   }
 
   if (isToolActive("hand")) {
     event.preventDefault();
+    event.stopPropagation();
+    document.body.classList.remove("is-hand-tool-active", "is-dragging-cell");
+    document.querySelectorAll(".is-dragging").forEach((element) => element.classList.remove("is-dragging"));
     window.getSelection()?.removeAllRanges();
-    return;
   }
 
   clearActiveTool();
   clearSelectedInventoryItem();
-});
+  return true;
+}
+
+document.addEventListener("pointerdown", clearInteractionFromEmptySpace, { capture: true });
+document.addEventListener("click", clearInteractionFromEmptySpace, { capture: true });
 
 document.addEventListener("keydown", (event) => {
   if (event.metaKey || event.ctrlKey || event.altKey) {
@@ -146,6 +155,11 @@ function refreshLayout() {
       top += getCellSize("animalPen").height + gap;
     }
 
+    if (state.buildings.bakery) {
+      moveCell("bakery", left, top);
+      top += getCellSize("bakery").height + gap;
+    }
+
     if (!isCellHidden("money")) {
       moveCell("money", left, top);
       top += getCellSize("money").height + gap;
@@ -182,6 +196,11 @@ function refreshLayout() {
   if (state.buildings.mill) {
     const position = state.cells.mill;
     moveCell("mill", position.left, position.top);
+  }
+
+  if (state.buildings.bakery) {
+    const position = state.cells.bakery;
+    moveCell("bakery", position.left, position.top);
   }
 
   if (state.buildings.animalPen) {

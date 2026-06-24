@@ -3,19 +3,11 @@ import { wheat } from "./items/wheat.js";
 import { strawberry } from "./items/strawberry.js";
 import { straw } from "./items/straw.js";
 
-export const SEEDS = {
-  wheatSeed: wheat.seed,
-  cabbageSeed: cabbage.seed,
-  strawberrySeed: strawberry.seed,
-  strawSeed: straw.seed,
-};
+export const CROP_ITEMS = [wheat, cabbage, strawberry, straw];
 
-export const CROPS = {
-  wheatCrop: wheat.crop,
-  cabbageCrop: cabbage.crop,
-  strawberryCrop: strawberry.crop,
-  strawCrop: straw.crop,
-};
+export const SEEDS = Object.fromEntries(CROP_ITEMS.map(({ seed }) => [seed.id, seed]));
+
+export const CROPS = Object.fromEntries(CROP_ITEMS.map(({ crop }) => [crop.id, crop]));
 
 export function getSeed(seedId) {
   return SEEDS[seedId] || null;

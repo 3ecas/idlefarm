@@ -48,11 +48,8 @@ body.is-dragging-cell * {
   -webkit-user-select: none;
 }
 
-body.is-hand-tool-active,
-body.is-hand-tool-active .scene,
-body.is-hand-tool-active .workspace,
-body.is-hand-tool-active .grid-overlay,
-body.is-hand-tool-active * {
+body.is-hand-tool-active [data-cell-key],
+body.is-hand-tool-active [data-cell-key] * {
   user-select: none;
   -webkit-user-select: none;
 }
@@ -203,6 +200,82 @@ body.is-dragging-cell {
   line-height: 1;
   color: rgba(63, 53, 71, 0.78);
   pointer-events: none;
+}
+
+.seed-picker {
+  position: absolute;
+  z-index: 22;
+  width: 172px;
+  max-height: 220px;
+  padding: 8px;
+  border: 1px solid rgba(113, 151, 98, 0.28);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 12px 30px rgba(85, 64, 120, 0.14);
+}
+
+.seed-picker__title {
+  margin: 0 0 6px;
+  padding: 0 2px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.1;
+  color: rgba(63, 53, 71, 0.82);
+}
+
+.seed-picker__list {
+  display: grid;
+  gap: 5px;
+  max-height: 184px;
+  overflow-y: auto;
+}
+
+.seed-picker__item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 30px;
+  padding: 6px 7px;
+  border: 1px solid rgba(127, 196, 127, 0.34);
+  border-radius: 7px;
+  background: #eef8e8;
+  cursor: pointer;
+}
+
+.seed-picker__item:hover,
+.seed-picker__item:focus-visible {
+  border-color: rgba(79, 139, 203, 0.45);
+  background: #e7f4ff;
+}
+
+.seed-picker__name,
+.seed-picker__meta,
+.seed-picker__empty {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.1;
+}
+
+.seed-picker__name {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: rgba(63, 53, 71, 0.86);
+}
+
+.seed-picker__meta {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: rgba(63, 53, 71, 0.58);
+}
+
+.seed-picker__empty {
+  padding: 8px 4px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: rgba(63, 53, 71, 0.56);
 }
 
 @keyframes farm-pop {
@@ -645,6 +718,7 @@ body.is-dragging-cell {
 
 .build-cell,
 .mill-cell,
+.bakery-cell,
 .animal-pen-cell,
 .shopping-cell,
 .barn-cell {
@@ -673,6 +747,11 @@ body.is-dragging-cell {
   min-height: 128px;
 }
 
+.bakery-cell {
+  width: 176px;
+  min-height: 156px;
+}
+
 .shopping-cell {
   cursor: default;
   touch-action: auto;
@@ -689,6 +768,7 @@ body.is-dragging-cell {
 .shopping-cell.is-dragging,
 .build-cell.is-dragging,
 .mill-cell.is-dragging,
+.bakery-cell.is-dragging,
 .animal-pen-cell.is-dragging,
 .barn-cell.is-dragging {
   cursor: grabbing;
@@ -696,6 +776,7 @@ body.is-dragging-cell {
 
 .build-header,
 .mill-header,
+.bakery-header,
 .animal-pen-header,
 .shopping-header,
 .barn-header {
@@ -707,6 +788,7 @@ body.is-dragging-cell {
 
 .build-title,
 .mill-title,
+.bakery-title,
 .animal-pen-title,
 .shopping-title,
 .barn-title {
@@ -715,6 +797,11 @@ body.is-dragging-cell {
   gap: 4px;
   font-size: 0.82rem;
   font-weight: 700;
+}
+
+.bakery-title__icon {
+  font-size: 0.72rem;
+  line-height: 1;
 }
 
 .market-toggle,
@@ -762,21 +849,23 @@ body.is-dragging-cell {
   transform: none;
 }
 
-.build-product__name,
+.build-product__main,
 .build-product__cost {
   display: block;
 }
 
 .build-product {
   display: grid;
-  place-items: center;
+  align-items: center;
   gap: 2px;
-  text-align: center;
+  text-align: left;
 }
 
-.build-product__icon {
-  font-size: 0.88rem;
-  line-height: 1;
+.build-product__main {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  min-width: 0;
 }
 
 .build-product__name {
@@ -788,6 +877,10 @@ body.is-dragging-cell {
 .mill-action__ingredients {
   font-size: 0.68rem;
   color: var(--muted);
+}
+
+.build-product__cost {
+  line-height: 1.2;
 }
 
 .mill-action {
@@ -1105,6 +1198,7 @@ body.is-hand-tool-active .money-header,
 body.is-hand-tool-active .menu-header,
 body.is-hand-tool-active .build-header,
 body.is-hand-tool-active .mill-header,
+body.is-hand-tool-active .bakery-header,
 body.is-hand-tool-active .tools-header,
 body.is-hand-tool-active .barn-header,
 body.is-hand-tool-active .animal-pen-header {
@@ -1117,6 +1211,7 @@ body.is-hand-tool-active .money-cell.is-dragging,
 body.is-hand-tool-active .menu-cell.is-dragging,
 body.is-hand-tool-active .build-cell.is-dragging,
 body.is-hand-tool-active .mill-cell.is-dragging,
+body.is-hand-tool-active .bakery-cell.is-dragging,
 body.is-hand-tool-active .tools-cell.is-dragging,
 body.is-hand-tool-active .barn-cell.is-dragging,
 body.is-hand-tool-active .animal-pen-cell.is-dragging {

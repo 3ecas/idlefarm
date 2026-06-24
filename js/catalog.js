@@ -1,22 +1,19 @@
 import { flour } from "./items/flour.js";
-import { cow } from "./items/cow.js";
-import { milk } from "./items/milk.js";
+import { bread } from "./items/bread.js";
 import { nails } from "./items/nails.js";
 import { wood } from "./items/wood.js";
-import { CROPS, getCrop, getSeed, SEEDS } from "./seeds.js";
+import { ANIMAL_ITEMS, ANIMAL_PRODUCTS, ANIMALS, getAnimal } from "./animals.js";
+import { CROP_ITEMS, CROPS, getCrop, getSeed, SEEDS } from "./seeds.js";
 
 export const MATERIALS = {
   wood,
   nails,
 };
 
-export const ANIMALS = {
-  cow: cow.animal,
-};
-
 export const PROCESSED_GOODS = {
   flour,
-  milk,
+  bread,
+  ...ANIMAL_PRODUCTS,
 };
 
 export const PRODUCTS = {
@@ -31,12 +28,12 @@ export const SHOP_SECTIONS = [
   {
     key: "seeds",
     label: "Seeds",
-    productIds: ["wheatSeed", "cabbageSeed", "strawberrySeed", "strawSeed"],
+    productIds: CROP_ITEMS.map(({ seed }) => seed.id),
   },
   {
     key: "animals",
     label: "Animals",
-    productIds: ["cow"],
+    productIds: ANIMAL_ITEMS.map(({ animal }) => animal.id),
   },
   {
     key: "farmUpgrades",
@@ -53,7 +50,7 @@ export const SHOP_SECTIONS = [
 export const MARKET_SECTIONS = SHOP_SECTIONS;
 
 export function getProduct(productId) {
-  return getSeed(productId) || getCrop(productId) || ANIMALS[productId] || MATERIALS[productId] || PROCESSED_GOODS[productId] || null;
+  return getSeed(productId) || getCrop(productId) || getAnimal(productId) || MATERIALS[productId] || PROCESSED_GOODS[productId] || null;
 }
 
 export function getProductSellPrice(productId) {

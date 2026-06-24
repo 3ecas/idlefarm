@@ -5,4 +5,8 @@ export const milk = {
   inventoryName: "Milk",
   price: 0,
   sellPrice: 6,
+  productionDurationMs: 20000,
+  foodCost: {
+    strawCrop: 2,
+  },
 };

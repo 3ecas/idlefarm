@@ -5,4 +5,7 @@ export const flour = {
   inventoryName: "Flour",
   price: 0,
   sellPrice: 5,
+  millIngredients: {
+    wheatCrop: 2,
+  },
 };

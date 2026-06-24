@@ -7,6 +7,7 @@ import {
   onStateChange,
   state,
 } from "./state.js";
+import { getProduct } from "./catalog.js";
 import { mountMovableCell } from "./drag.js";
 
 function clampToWorkspace(workspace, left, top) {
@@ -52,7 +53,14 @@ export function mountMill(container) {
       state.cells.mill.left,
       state.cells.mill.top
     );
-    const wheat = getBarnItemQuantity("wheatCrop");
+    const flour = getProduct("flour");
+    const ingredients = flour?.millIngredients || {};
+    const hasIngredients = Object.entries(ingredients).every(
+      ([productId, quantity]) => getBarnItemQuantity(productId) >= quantity
+    );
+    const ingredientText = Object.entries(ingredients)
+      .map(([productId, quantity]) => `${getProduct(productId)?.marketName || "Item"} x${quantity}`)
+      .join(", ");
 
     container.innerHTML = `
       <section class="mill-cell" data-cell-key="mill" data-mill-cell style="left:${position.left}px; top:${position.top}px;" aria-label="Mill">
@@ -63,9 +71,9 @@ export function mountMill(container) {
           </span>
         </div>
         <div class="mill-body">
-          <button type="button" class="mill-action ${wheat < 2 ? "is-disabled" : ""}" data-mill-wheat aria-disabled="${wheat < 2 ? "true" : "false"}">
-            <span class="mill-action__name">Wheat Flour</span>
-            <span class="mill-action__ingredients">Wheat x2</span>
+          <button type="button" class="mill-action ${hasIngredients ? "" : "is-disabled"}" data-mill-wheat aria-disabled="${hasIngredients ? "false" : "true"}">
+            <span class="mill-action__name">${flour?.marketName || "Flour"}</span>
+            <span class="mill-action__ingredients">${ingredientText}</span>
           </button>
         </div>
       </section>

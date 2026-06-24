@@ -1,14 +1,16 @@
+import { milk } from "./milk.js";
+
+const animal = {
+  id: "cow",
+  category: "animals",
+  marketName: "Cow",
+  inventoryName: "Cow",
+  price: 12,
+  outputProductId: milk.id,
+};
+
 export const cow = {
-  animal: {
-    id: "cow",
-    category: "animals",
-    marketName: "Cow",
-    inventoryName: "Cow",
-    price: 12,
-    outputProductId: "milk",
-    productionDurationMs: 20000,
-    foodCost: {
-      strawCrop: 2,
-    },
-  },
+  animal,
+  product: milk,
+  products: [animal, milk],
 };

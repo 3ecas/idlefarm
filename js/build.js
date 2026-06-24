@@ -1,6 +1,8 @@
 import {
+  buildBakery,
   buildAnimalPen,
   buildMill,
+  canBuildBakery,
   canBuildAnimalPen,
   canBuildMill,
   getBarnItemQuantity,
@@ -53,6 +55,13 @@ export function mountBuild(container) {
       return;
     }
 
+    const bakeryButton = event.target.closest("[data-build-bakery]");
+    if (bakeryButton) {
+      event.preventDefault();
+      buildBakery();
+      return;
+    }
+
     const animalPenButton = event.target.closest("[data-build-animal-pen]");
     if (animalPenButton) {
       event.preventDefault();
@@ -72,10 +81,12 @@ export function mountBuild(container) {
       state.cells.build.top
     );
     const millBuilt = isBuildingBuilt("mill");
+    const bakeryBuilt = isBuildingBuilt("bakery");
     const animalPenBuilt = isBuildingBuilt("animalPen");
     const wood = getBarnItemQuantity("wood");
     const nails = getBarnItemQuantity("nails");
     const millLabel = millBuilt ? "Already Built" : "Mill";
+    const bakeryLabel = bakeryBuilt ? "Already Built" : "Bakery";
     const animalPenLabel = animalPenBuilt ? "Already Built" : "Cow Pen";
 
     container.innerHTML = `
@@ -89,14 +100,22 @@ export function mountBuild(container) {
         </div>
         <div class="build-body">
           <button type="button" class="build-product ${millBuilt || !canBuildMill() ? "is-disabled" : ""}" data-build-mill aria-disabled="${millBuilt || !canBuildMill() ? "true" : "false"}">
-            <span class="build-product__icon" aria-hidden="true">🏭</span>
-            <span class="build-product__name">${millLabel}</span>
+            <span class="build-product__main">
+              <span class="build-product__name">${millLabel}</span>
+            </span>
             ${millBuilt ? "" : `<span class="build-product__cost">Wood ${wood}/15 - Nails ${nails}/5</span>`}
           </button>
+          <button type="button" class="build-product ${bakeryBuilt || !canBuildBakery() ? "is-disabled" : ""}" data-build-bakery aria-disabled="${bakeryBuilt || !canBuildBakery() ? "true" : "false"}">
+            <span class="build-product__main">
+              <span class="build-product__name">${bakeryLabel}</span>
+            </span>
+            ${bakeryBuilt ? "" : `<span class="build-product__cost">Wood ${wood}/5 - Nails ${nails}/5</span>`}
+          </button>
           <button type="button" class="build-product ${animalPenBuilt || !canBuildAnimalPen() ? "is-disabled" : ""}" data-build-animal-pen aria-disabled="${animalPenBuilt || !canBuildAnimalPen() ? "true" : "false"}">
-            <span class="build-product__icon" aria-hidden="true">🐄</span>
-            <span class="build-product__name">${animalPenLabel}</span>
-            ${animalPenBuilt ? "" : `<span class="build-product__cost">Wood 20/20 - Nails 10/10</span>`}
+            <span class="build-product__main">
+              <span class="build-product__name">${animalPenLabel}</span>
+            </span>
+            ${animalPenBuilt ? "" : `<span class="build-product__cost">Wood ${wood}/20 - Nails ${nails}/10</span>`}
           </button>
         </div>
       </section>

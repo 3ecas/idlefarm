@@ -18,21 +18,32 @@ function getAnimalProductionProgress(animal) {
     return 0;
   }
 
-  const product = getProduct(animal.productId);
-  const duration = Number.isFinite(product?.productionDurationMs) ? product.productionDurationMs : 20000;
+  const animalProduct = getProduct(animal.productId);
+  const product = animalProduct?.outputProductId ? getProduct(animalProduct.outputProductId) : null;
+  const duration = Number.isFinite(product?.productionDurationMs) ? product.productionDurationMs : 0;
   if (duration <= 0) {
-    return 100;
+    return 0;
   }
 
   const remaining = Math.max(0, animal.readyAt - Date.now());
   return Math.max(0, Math.min(100, Math.round((1 - remaining / duration) * 100)));
 }
 
+function getRequirementText(product) {
+  const foodCost = product?.foodCost && typeof product.foodCost === "object" ? product.foodCost : {};
+  return Object.entries(foodCost)
+    .map(([productId, quantity]) => `${getProduct(productId)?.marketName || "Item"} x${quantity}`)
+    .join(", ");
+}
+
 function renderAnimalCard(animal) {
   const product = getProduct(animal.productId);
+  const outputProduct = product?.outputProductId ? getProduct(product.outputProductId) : null;
   const progress = getAnimalProductionProgress(animal);
   const label = product?.marketName || "Animal";
-  const status = animal.readyAt ? `Milk ${progress}%` : "Needs straw 0%";
+  const outputLabel = outputProduct?.marketName || "Product";
+  const requirementText = getRequirementText(outputProduct);
+  const status = animal.readyAt ? `${outputLabel} ${progress}%` : `Needs ${requirementText || "food"} 0%`;
 
   return `
     <div class="animal-item" data-animal-id="${animal.id}">
