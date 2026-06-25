@@ -2,9 +2,10 @@ import { getCellDragBounds, hideCell, isCellHidden, moveCell, onStateChange, set
 import { mountMovableCell } from "./drag.js";
 
 const MENU_ITEMS = [
-  { key: "market", label: "Shop", icon: "🛒" },
+  { key: "market", label: "Market", icon: "🛒" },
   { key: "sellMarket", label: "Market", icon: "⚖" },
   { key: "barn", label: "Barn", icon: "📦" },
+  { key: "fastItems", label: "Fast items", icon: "Fx" },
   { key: "money", label: "Money", icon: "🪙" },
   { key: "build", label: "Build", icon: "🔨" },
 ];

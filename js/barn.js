@@ -15,9 +15,18 @@ import { getInventoryEntries, handleInventorySelection, isSelectedInventoryItem 
 import { mountMovableCell } from "./drag.js";
 import { addProductToSellStand, getSellCellFromPoint } from "./sell.js";
 import { getAnimalPenDropTargetFromPoint } from "./animalPen.js";
+import {
+  getPanelCategory,
+  getPanelTab,
+  renderInventoryTile,
+  renderPanelTabButtons,
+  setPanelTab,
+} from "./inventoryPanel.js";
 
 const DRAG_THRESHOLD = 4;
 const DRAG_SUPPRESS_MS = 300;
+const PANEL_KEY = "barn";
+const PANEL_TITLE = "Barn";
 
 function clampToWorkspace(workspace, left, top) {
   const bounds = getCellDragBounds("barn");
@@ -32,14 +41,6 @@ function clampToWorkspace(workspace, left, top) {
 
 let activeSeedDrag = null;
 const recentlyDraggedSeedIds = new Map();
-const BARN_SECTIONS = [
-  { key: "seeds", label: "Seeds", categories: ["seeds"] },
-  { key: "crops", label: "Crops", categories: ["crops"] },
-  { key: "animals", label: "Animals", categories: ["animals"] },
-  { key: "materials", label: "Materials", categories: ["materials"] },
-  { key: "products", label: "Products", categories: ["processed"] },
-];
-const barnSectionOpenState = new Map(BARN_SECTIONS.map((section) => [section.key, false]));
 let barnWasHidden = true;
 
 function markRecentlyDraggedSeed(productId) {
@@ -94,6 +95,7 @@ function createSeedDragGhost(button, left, top) {
   const ghost = button.cloneNode(true);
   ghost.classList.remove("is-dragging", "is-selected");
   ghost.classList.add("inventory-item--ghost");
+  ghost.classList.add("inventory-tile--ghost");
   ghost.setAttribute("aria-hidden", "true");
   ghost.tabIndex = -1;
   ghost.draggable = false;
@@ -196,64 +198,39 @@ function isSellableProduct(product) {
   return product.category === "crops" || product.category === "processed";
 }
 
-function renderInventoryItem(product, quantity) {
-  if (product.category === "seeds" || product.category === "animals") {
-    return `
-    <button
-      type="button"
-      class="inventory-item ${isSelectedInventoryItem(product.id) ? "is-selected" : ""}"
-      data-inventory-product="${product.id}"
-      draggable="false"
-      >
-        <span class="inventory-item__name">${product.inventoryName}</span>
-        <span class="inventory-item__count">x${quantity}</span>
-      </button>
-    `;
-  }
-
-  if (isSellableProduct(product)) {
-    return `
-      <button
-        type="button"
-        class="inventory-item"
-        data-inventory-product="${product.id}"
-        data-sell-product="${product.id}"
-        draggable="false"
-      >
-        <span class="inventory-item__name">${product.inventoryName}</span>
-        <span class="inventory-item__count">x${quantity}</span>
-      </button>
-    `;
-  }
-
-  return `
-    <div class="inventory-item inventory-item--static">
-      <span class="inventory-item__name">${product.inventoryName}</span>
-      <span class="inventory-item__count">x${quantity}</span>
-    </div>
-  `;
+function getActiveTab() {
+  return getPanelTab(PANEL_KEY, "seeds");
 }
 
-function renderBarnSection(section, entries) {
-  const sectionEntries = entries.filter(({ product }) => section.categories.includes(product.category));
-  const isOpen = barnSectionOpenState.get(section.key) ?? false;
-  return `
-    <details class="barn-section barn-section--${section.key}" data-barn-section="${section.key}" ${isOpen ? "open" : ""}>
-      <summary>${section.label}</summary>
-      <div class="barn-section__body">
-        ${
-          sectionEntries.length > 0
-            ? sectionEntries.map(({ product, quantity }) => renderInventoryItem(product, quantity)).join("")
-            : `<div class="inventory-item inventory-item--empty">Empty</div>`
-        }
-      </div>
-    </details>
-  `;
+function getPanelEntries(entries, activeTab) {
+  const category = getPanelCategory(activeTab);
+  return entries
+    .filter(({ product }) => product.category === category)
+    .sort((first, second) => first.product.inventoryName.localeCompare(second.product.inventoryName));
+}
+
+function renderBarnTile(product, quantity) {
+  const isSeed = product.category === "seeds";
+  const isAnimal = product.category === "animals";
+  const isSellable = isSellableProduct(product);
+  const isInteractive = isSeed || isAnimal || isSellable;
+  const dataAttributes = isSeed || isAnimal || isSellable
+    ? `data-inventory-product="${product.id}"${isSellable ? ` data-sell-product="${product.id}"` : ""}`
+    : "";
+
+  return renderInventoryTile({
+    title: product.inventoryName,
+    meta: `x${quantity}`,
+    dataAttributes,
+    isSelected: isSelectedInventoryItem(product.id),
+    isStatic: !isInteractive,
+    ariaLabel: product.inventoryName,
+  });
 }
 
 export function mountBarn(container) {
   mountMovableCell(container, {
-    key: "barn",
+    key: PANEL_KEY,
     selector: "[data-barn-cell]",
     dragHandle: ".barn-header",
     onDrop: (_dragSnapshot, finalPosition) => {
@@ -261,15 +238,6 @@ export function mountBarn(container) {
       return true;
     },
   });
-
-  container.addEventListener("toggle", (event) => {
-    const details = event.target.closest?.("[data-barn-section]");
-    if (!details) {
-      return;
-    }
-
-    barnSectionOpenState.set(details.dataset.barnSection, details.open);
-  }, true);
 
   container.addEventListener("click", (event) => {
     const closeButton = event.target.closest("[data-close-cell]");
@@ -280,16 +248,26 @@ export function mountBarn(container) {
       return;
     }
 
+    const tabButton = event.target.closest("[data-inventory-tab]");
+    if (tabButton) {
+      event.preventDefault();
+      setPanelTab(PANEL_KEY, tabButton.dataset.inventoryTab);
+      render();
+      return;
+    }
+
     const inventoryButton = event.target.closest("[data-inventory-product]");
     if (inventoryButton) {
       event.preventDefault();
       if (wasRecentlyDraggedSeed(inventoryButton.dataset.inventoryProduct)) {
         return;
       }
-      handleInventorySelection(inventoryButton.dataset.inventoryProduct);
-      return;
-    }
 
+      const product = getProduct(inventoryButton.dataset.inventoryProduct);
+      if (product?.category === "seeds") {
+        handleInventorySelection(inventoryButton.dataset.inventoryProduct);
+      }
+    }
   });
 
   container.addEventListener("pointerdown", (event) => {
@@ -353,9 +331,6 @@ export function mountBarn(container) {
     }
 
     if (barnWasHidden) {
-      for (const section of BARN_SECTIONS) {
-        barnSectionOpenState.set(section.key, false);
-      }
       barnWasHidden = false;
     }
 
@@ -365,20 +340,31 @@ export function mountBarn(container) {
       state.cells.barn.left,
       state.cells.barn.top
     );
+    const activeTab = getActiveTab();
+    const tabEntries = getPanelEntries(entries, activeTab);
 
     container.innerHTML = `
-      <section class="barn-cell is-open" data-cell-key="barn" data-barn-cell style="left:${position.left}px; top:${position.top}px;" aria-label="Barn">
+      <section class="barn-cell" data-cell-key="barn" data-barn-cell style="left:${position.left}px; top:${position.top}px;" aria-label="${PANEL_TITLE}">
         <div class="barn-header">
           <span class="barn-title">
             <span class="barn-title__icon" aria-hidden="true">📦</span>
-            <span class="barn-title__text">Barn</span>
+            <span class="barn-title__text">${PANEL_TITLE}</span>
           </span>
           <div class="cell-header-actions">
             <button type="button" class="cell-close" data-close-cell aria-label="Close Barn">x</button>
           </div>
         </div>
         <div class="barn-body">
-          ${BARN_SECTIONS.map((section) => renderBarnSection(section, entries)).join("")}
+          <div class="inventory-tabs" role="tablist" aria-label="Barn categories">
+            ${renderPanelTabButtons(PANEL_KEY, activeTab)}
+          </div>
+          <div class="inventory-grid">
+            ${
+              tabEntries.length > 0
+                ? tabEntries.map(({ product, quantity }) => renderBarnTile(product, quantity)).join("")
+                : `<div class="inventory-empty">Empty</div>`
+            }
+          </div>
         </div>
       </section>
     `;

@@ -45,7 +45,7 @@ function getBakeryStatusText() {
   }
 
   const progress = getBakeryOrderProgress(order);
-  return queueCount > 1 ? `Baking ${progress}% · Queue ${queueCount}` : `Baking ${progress}%`;
+  return queueCount > 1 ? `Baking ${progress}% Queue ${queueCount}` : `Baking ${progress}%`;
 }
 
 export function mountBakery(container) {

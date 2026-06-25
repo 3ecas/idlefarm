@@ -1,7 +1,9 @@
 import { mountAnimalPen } from "./animalPen.js";
+import { mountAnimalFeeder } from "./animalFeeder.js";
 import { mountBarn } from "./barn.js";
 import { mountBuild } from "./build.js";
 import { mountBakery } from "./bakery.js";
+import { mountFastItems } from "./fastItems.js";
 import { mountMarket } from "./market.js";
 import { mountMenu } from "./menu.js";
 import { mountMill } from "./mill.js";
@@ -9,12 +11,11 @@ import { mountMoney } from "./money.js";
 import { mountPlot } from "./plot.js";
 import { mountSellMarket } from "./sellMarket.js";
 import { mountShopping } from "./shopping.js";
-import { mountToolCursor } from "./cursor.js";
+import { mountFarmCursors } from "./cursor.js";
 import { bootstrapGamePersistence } from "./persistence.js";
-import { mountTools } from "./tools.js";
 import { getCellSize } from "./layout.js";
 import { clearSelectedInventoryItem } from "./inventory.js";
-import { clearActiveTool, getStarterLayoutPositions, isCellHidden, isToolActive, moveCell, onStateChange, restartFarm, setActiveTool, showCell, state } from "./state.js";
+import { getStarterLayoutPositions, isCellHidden, moveCell, onStateChange, restartFarm, showCell, state } from "./state.js";
 
 const statusRoot = document.getElementById("status");
 const cellMount = document.getElementById("cell-mount");
@@ -23,12 +24,13 @@ const sellMarketMount = document.getElementById("sell-market-mount");
 const moneyMount = document.getElementById("money-mount");
 const shoppingMount = document.getElementById("shopping-mount");
 const barnMount = document.getElementById("barn-mount");
+const fastItemsMount = document.getElementById("fast-items-mount");
 const buildMount = document.getElementById("build-mount");
 const millMount = document.getElementById("mill-mount");
 const bakeryMount = document.getElementById("bakery-mount");
+const animalFeederMount = document.getElementById("animal-feeder-mount");
 const animalPenMount = document.getElementById("animal-pen-mount");
 const menuMount = document.getElementById("menu-mount");
-const toolsMount = document.getElementById("tools-mount");
 const restartButton = document.querySelector("[data-restart-farm]");
 
 function renderStatus() {
@@ -42,13 +44,14 @@ mountSellMarket(sellMarketMount);
 mountMoney(moneyMount);
 mountShopping(shoppingMount);
 mountBarn(barnMount);
+mountFastItems(fastItemsMount);
 mountBuild(buildMount);
 mountMill(millMount);
 mountBakery(bakeryMount);
+mountAnimalFeeder(animalFeederMount);
 mountAnimalPen(animalPenMount);
 mountMenu(menuMount);
-mountTools(toolsMount);
-mountToolCursor();
+mountFarmCursors();
 onStateChange(renderStatus);
 renderStatus();
 ensureCorePanelsVisible();
@@ -66,45 +69,12 @@ function clearInteractionFromEmptySpace(event) {
     return false;
   }
 
-  if (isToolActive("hand")) {
-    event.preventDefault();
-    event.stopPropagation();
-    document.body.classList.remove("is-hand-tool-active", "is-dragging-cell");
-    document.querySelectorAll(".is-dragging").forEach((element) => element.classList.remove("is-dragging"));
-    window.getSelection()?.removeAllRanges();
-  }
-
-  clearActiveTool();
   clearSelectedInventoryItem();
   return true;
 }
 
 document.addEventListener("pointerdown", clearInteractionFromEmptySpace, { capture: true });
 document.addEventListener("click", clearInteractionFromEmptySpace, { capture: true });
-
-document.addEventListener("keydown", (event) => {
-  if (event.metaKey || event.ctrlKey || event.altKey) {
-    return;
-  }
-
-  const interactiveElement = event.target.closest?.("input, textarea, select, [contenteditable='true']");
-  if (interactiveElement) {
-    return;
-  }
-
-  const shortcutTools = {
-    h: "hand",
-    w: "water",
-    c: "harvest",
-  };
-  const toolId = shortcutTools[event.key.toLowerCase()];
-  if (!toolId) {
-    return;
-  }
-
-  event.preventDefault();
-  setActiveTool(toolId);
-});
 
 if (restartButton) {
   restartButton.addEventListener("click", () => {
@@ -130,11 +100,6 @@ function refreshLayout() {
       top += getCellSize("menu").height + gap;
     }
 
-    if (!isCellHidden("tools")) {
-      moveCell("tools", left, top);
-      top += getCellSize("tools").height + gap;
-    }
-
     if (!isCellHidden("market")) {
       moveCell("market", left, top);
       top += getCellSize("market").height + gap;
@@ -143,6 +108,11 @@ function refreshLayout() {
     if (!isCellHidden("sellMarket")) {
       moveCell("sellMarket", left, top);
       top += getCellSize("sellMarket").height + gap;
+    }
+
+    if (!isCellHidden("fastItems")) {
+      moveCell("fastItems", left, top);
+      top += getCellSize("fastItems").height + gap;
     }
 
     if (!isCellHidden("build")) {
@@ -158,6 +128,11 @@ function refreshLayout() {
     if (state.buildings.bakery) {
       moveCell("bakery", left, top);
       top += getCellSize("bakery").height + gap;
+    }
+
+    if (state.buildings.animalFeeder) {
+      moveCell("animalFeeder", left, top);
+      top += getCellSize("animalFeeder").height + gap;
     }
 
     if (!isCellHidden("money")) {
@@ -176,7 +151,7 @@ function refreshLayout() {
     return;
   }
 
-  for (const key of ["market", "sellMarket", "money", "barn", "build"]) {
+  for (const key of ["market", "sellMarket", "money", "barn", "fastItems", "build"]) {
     if (isCellHidden(key)) {
       continue;
     }
@@ -185,7 +160,7 @@ function refreshLayout() {
     moveCell(key, position.left, position.top);
   }
 
-  for (const key of ["menu", "tools"]) {
+  for (const key of ["menu"]) {
     if (isCellHidden(key)) {
       continue;
     }
@@ -203,6 +178,11 @@ function refreshLayout() {
     moveCell("bakery", position.left, position.top);
   }
 
+  if (state.buildings.animalFeeder) {
+    const position = state.cells.animalFeeder;
+    moveCell("animalFeeder", position.left, position.top);
+  }
+
   if (state.buildings.animalPen) {
     const position = state.cells.animalPen;
     moveCell("animalPen", position.left, position.top);
@@ -215,12 +195,8 @@ function ensureCorePanelsVisible() {
   if (isCellHidden("menu")) {
     showCell("menu");
   }
-  if (isCellHidden("tools")) {
-    showCell("tools");
-  }
 
   moveCell("menu", starterLayout.menu.left, starterLayout.menu.top);
-  moveCell("tools", starterLayout.tools.left, starterLayout.tools.top);
 }
 
 window.addEventListener("resize", refreshLayout);

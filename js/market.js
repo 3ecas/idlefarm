@@ -12,6 +12,7 @@ import {
 } from "./state.js";
 import { SHOP_SECTIONS, getProduct } from "./catalog.js";
 import { mountMovableCell } from "./drag.js";
+import { isShoppingListOpen, toggleShoppingList } from "./shopping.js";
 
 let activeShopTab = "seeds";
 
@@ -90,11 +91,18 @@ export function mountMarket(container) {
   });
 
   container.addEventListener("click", (event) => {
+    const shoppingToggleButton = event.target.closest("[data-shopping-toggle]");
+    if (shoppingToggleButton) {
+      event.preventDefault();
+      toggleShoppingList();
+      return;
+    }
+
     const closeButton = event.target.closest("[data-close-cell]");
     if (closeButton) {
       event.preventDefault();
       hideCell("market");
-      setMessage("Shop closed.");
+      setMessage("Market stand closed.");
       return;
     }
 
@@ -141,18 +149,27 @@ export function mountMarket(container) {
     }
 
     container.innerHTML = `
-      <section class="market-cell is-open" data-cell-key="market" data-market-cell style="left:${position.left}px; top:${position.top}px;" aria-label="Shop">
+      <section class="market-cell is-open" data-cell-key="market" data-market-cell style="left:${position.left}px; top:${position.top}px;" aria-label="Market stand">
         <div class="market-header">
           <span class="market-title">
             <span class="market-title__icon" aria-hidden="true">🛒</span>
-            <span class="market-title__text">Shop</span>
+            <span class="market-title__text">Market stand</span>
           </span>
           <div class="cell-header-actions">
-            <button type="button" class="cell-close" data-close-cell aria-label="Close Shop">x</button>
+            <button
+              type="button"
+              class="shopping-toggle"
+              data-shopping-toggle
+              aria-label="${isShoppingListOpen() ? "Hide shopping cart" : "Show shopping cart"}"
+              aria-expanded="${isShoppingListOpen() ? "true" : "false"}"
+            >
+              ${isShoppingListOpen() ? "-" : "+"}
+            </button>
+            <button type="button" class="cell-close" data-close-cell aria-label="Close Market stand">x</button>
           </div>
         </div>
         <div class="market-body">
-          <div class="market-tabs" role="tablist" aria-label="Shop sections">
+          <div class="market-tabs" role="tablist" aria-label="Market stand sections">
             ${SHOP_SECTIONS.map(renderMarketTab).join("")}
           </div>
           <div class="market-tab-panel market-${selectedSection.key}" role="tabpanel">

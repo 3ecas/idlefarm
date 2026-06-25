@@ -62,10 +62,12 @@ export function mountMoney(container) {
           <button type="button" class="cell-close" data-close-cell aria-label="Close Money">x</button>
         </div>
         <div class="money-body">
-          <span class="money-coin" aria-hidden="true"></span>
-          <span class="money-value">${state.coins}</span>
+          <span class="money-body__value">
+            <span class="money-coin" aria-hidden="true"></span>
+            <span class="money-value">${state.coins}</span>
+          </span>
+          <button type="button" class="money-add" data-add-coins aria-label="Add 100 coins">+</button>
         </div>
-        <button type="button" class="money-add" data-add-coins>+</button>
       </section>
     `;
   }

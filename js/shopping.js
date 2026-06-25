@@ -1,5 +1,5 @@
 import { getProduct } from "./catalog.js";
-import { isCellHidden, onStateChange, purchaseShoppingList, removeShoppingItem, state } from "./state.js";
+import { hideCell, isCellHidden, onStateChange, purchaseShoppingList, removeShoppingItem, setMessage, state, showCell } from "./state.js";
 
 const SHOPPING_WIDTH = 176;
 const SHOPPING_HEIGHT = 144;
@@ -61,6 +61,21 @@ function getShoppingEntries() {
     .filter(Boolean);
 }
 
+export function isShoppingListOpen() {
+  return !isCellHidden("shopping");
+}
+
+export function toggleShoppingList() {
+  if (isCellHidden("shopping")) {
+    showCell("shopping");
+    setMessage("Shopping opened.");
+    return;
+  }
+
+  hideCell("shopping");
+  setMessage("Shopping closed.");
+}
+
 export function mountShopping(container) {
   window.addEventListener("idle-farm-market-moved", () => {
     scheduleDockRender();
@@ -69,13 +84,23 @@ export function mountShopping(container) {
   container.addEventListener("click", (event) => {
     const removeButton = event.target.closest("[data-remove-product]");
     if (removeButton) {
+      event.preventDefault();
       removeShoppingItem(removeButton.dataset.removeProduct);
       return;
     }
 
     const purchaseButton = event.target.closest("[data-purchase-shopping]");
     if (purchaseButton) {
+      event.preventDefault();
       purchaseShoppingList();
+      return;
+    }
+
+    const closeButton = event.target.closest("[data-close-cell]");
+    if (closeButton) {
+      event.preventDefault();
+      hideCell("shopping");
+      setMessage("Shopping closed.");
     }
   });
 
@@ -88,38 +113,39 @@ export function mountShopping(container) {
     }
 
     const entries = getShoppingEntries();
-    if (entries.length === 0) {
-      container.innerHTML = "";
-      return;
-    }
-
     const position = getShoppingPosition();
+    const hasEntries = entries.length > 0;
 
     container.innerHTML = `
       <section class="shopping-cell" data-cell-key="shopping" data-shopping-cell style="left:${position.left}px; top:${position.top}px;" aria-label="Shopping list">
         <div class="shopping-header">
           <span class="shopping-title">Shopping list</span>
+          <button type="button" class="cell-close" data-close-cell aria-label="Close Shopping list">x</button>
         </div>
         <div class="shopping-body">
-          ${entries
-            .map(
-              ({ product, quantity }) => `
-                <div class="shopping-item">
-                  <div class="shopping-item__name">${product.marketName} x${quantity}</div>
-                  <button
-                    type="button"
-                    class="shopping-item__remove"
-                    data-remove-product="${product.id}"
-                    aria-label="Remove one ${product.marketName}"
-                  >
-                    -
-                  </button>
-                </div>
-              `
-            )
-            .join("")}
+          ${
+            hasEntries
+              ? entries
+                  .map(
+                    ({ product, quantity }) => `
+                      <div class="shopping-item">
+                        <div class="shopping-item__name">${product.marketName} x${quantity}</div>
+                        <button
+                          type="button"
+                          class="shopping-item__remove"
+                          data-remove-product="${product.id}"
+                          aria-label="Remove one ${product.marketName}"
+                        >
+                          -
+                        </button>
+                      </div>
+                    `
+                  )
+                  .join("")
+              : `<div class="shopping-empty">Empty</div>`
+          }
         </div>
-        <button type="button" class="shopping-purchase" data-purchase-shopping>
+        <button type="button" class="shopping-purchase" data-purchase-shopping ${hasEntries ? "" : "disabled"}>
           Purchase
         </button>
       </section>

@@ -9,6 +9,7 @@ import {
   onProgressChange,
   onStateChange,
   plantSeedFromInventoryOnPlot,
+  setMessage,
   state,
   waterPlot,
 } from "./state.js";
@@ -114,33 +115,55 @@ export function mountPlot(container) {
       return;
     }
 
-    const selectedTool = state.ui.activeTool;
-    if (selectedTool === "water") {
+    if (plot.stage === "planted") {
       closeSeedPicker();
       waterPlot(plotId);
       return;
     }
 
-    if (selectedTool === "harvest") {
+    if (plot.stage === "mature") {
       closeSeedPicker();
       harvestPlot(plotId);
       return;
     }
 
-    if (selectedTool === "hand") {
+    if (plot.cropId) {
       closeSeedPicker();
-      render();
+      setMessage("Still growing.");
       return;
     }
 
-    if (plot.cropId) {
+    if (state.inventory.selectedItemId) {
       closeSeedPicker();
-      render();
+      plantSeedFromInventoryOnPlot(plotId, state.inventory.selectedItemId);
       return;
     }
 
     activeSeedPickerPlotId = activeSeedPickerPlotId === plotId ? null : plotId;
     render();
+  });
+
+  container.addEventListener("contextmenu", (event) => {
+    const cell = event.target.closest("[data-farm-cell]");
+    if (!cell) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const plot = state.farm.plots.find((entry) => entry.id === cell.dataset.cellKey);
+    if (!plot || !plot.cropId) {
+      return;
+    }
+
+    closeSeedPicker();
+    if (plot.stage === "planted" || plot.stage === "growing") {
+      harvestPlot(plot.id);
+      return;
+    }
+
+    setMessage("Ready to harvest.");
   });
 
   function render() {

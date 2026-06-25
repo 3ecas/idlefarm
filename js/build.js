@@ -1,8 +1,10 @@
 import {
   buildBakery,
+  buildAnimalFeeder,
   buildAnimalPen,
   buildMill,
   canBuildBakery,
+  canBuildAnimalFeeder,
   canBuildAnimalPen,
   canBuildMill,
   getBarnItemQuantity,
@@ -26,6 +28,21 @@ function clampToWorkspace(workspace, left, top) {
     left: Math.min(maxLeft, Math.max(0, left)),
     top: Math.min(maxTop, Math.max(0, top)),
   };
+}
+
+function renderBuildProduct(option) {
+  return `
+    <button type="button" class="build-product ${option.isBuilt || !option.canBuild ? "is-disabled" : ""}" ${option.dataAttribute} aria-disabled="${option.isBuilt || !option.canBuild ? "true" : "false"}">
+      <span class="build-product__main">
+        <span class="build-product__name">${option.label}</span>
+      </span>
+      ${option.isBuilt ? "" : `<span class="build-product__cost">${option.costLabel}</span>`}
+    </button>
+  `;
+}
+
+function sortBuildProductsByCost(firstOption, secondOption) {
+  return firstOption.totalCost - secondOption.totalCost;
 }
 
 export function mountBuild(container) {
@@ -62,6 +79,13 @@ export function mountBuild(container) {
       return;
     }
 
+    const animalFeederButton = event.target.closest("[data-build-animal-feeder]");
+    if (animalFeederButton) {
+      event.preventDefault();
+      buildAnimalFeeder();
+      return;
+    }
+
     const animalPenButton = event.target.closest("[data-build-animal-pen]");
     if (animalPenButton) {
       event.preventDefault();
@@ -82,12 +106,48 @@ export function mountBuild(container) {
     );
     const millBuilt = isBuildingBuilt("mill");
     const bakeryBuilt = isBuildingBuilt("bakery");
+    const animalFeederBuilt = isBuildingBuilt("animalFeeder");
     const animalPenBuilt = isBuildingBuilt("animalPen");
     const wood = getBarnItemQuantity("wood");
     const nails = getBarnItemQuantity("nails");
     const millLabel = millBuilt ? "Already Built" : "Mill";
     const bakeryLabel = bakeryBuilt ? "Already Built" : "Bakery";
+    const animalFeederLabel = animalFeederBuilt ? "Already Built" : "Animal Feeder";
     const animalPenLabel = animalPenBuilt ? "Already Built" : "Cow Pen";
+    const buildProducts = [
+      {
+        label: millLabel,
+        isBuilt: millBuilt,
+        canBuild: canBuildMill(),
+        totalCost: 20,
+        costLabel: `Wood ${wood}/15 - Nails ${nails}/5`,
+        dataAttribute: "data-build-mill",
+      },
+      {
+        label: bakeryLabel,
+        isBuilt: bakeryBuilt,
+        canBuild: canBuildBakery(),
+        totalCost: 10,
+        costLabel: `Wood ${wood}/5 - Nails ${nails}/5`,
+        dataAttribute: "data-build-bakery",
+      },
+      {
+        label: animalFeederLabel,
+        isBuilt: animalFeederBuilt,
+        canBuild: canBuildAnimalFeeder(),
+        totalCost: 15,
+        costLabel: `Wood ${wood}/10 - Nails ${nails}/5`,
+        dataAttribute: "data-build-animal-feeder",
+      },
+      {
+        label: animalPenLabel,
+        isBuilt: animalPenBuilt,
+        canBuild: canBuildAnimalPen(),
+        totalCost: 30,
+        costLabel: `Wood ${wood}/20 - Nails ${nails}/10`,
+        dataAttribute: "data-build-animal-pen",
+      },
+    ].sort(sortBuildProductsByCost);
 
     container.innerHTML = `
       <section class="build-cell" data-cell-key="build" data-build-cell style="left:${position.left}px; top:${position.top}px;" aria-label="Build">
@@ -99,24 +159,7 @@ export function mountBuild(container) {
           <button type="button" class="cell-close" data-close-cell aria-label="Close Build">x</button>
         </div>
         <div class="build-body">
-          <button type="button" class="build-product ${millBuilt || !canBuildMill() ? "is-disabled" : ""}" data-build-mill aria-disabled="${millBuilt || !canBuildMill() ? "true" : "false"}">
-            <span class="build-product__main">
-              <span class="build-product__name">${millLabel}</span>
-            </span>
-            ${millBuilt ? "" : `<span class="build-product__cost">Wood ${wood}/15 - Nails ${nails}/5</span>`}
-          </button>
-          <button type="button" class="build-product ${bakeryBuilt || !canBuildBakery() ? "is-disabled" : ""}" data-build-bakery aria-disabled="${bakeryBuilt || !canBuildBakery() ? "true" : "false"}">
-            <span class="build-product__main">
-              <span class="build-product__name">${bakeryLabel}</span>
-            </span>
-            ${bakeryBuilt ? "" : `<span class="build-product__cost">Wood ${wood}/5 - Nails ${nails}/5</span>`}
-          </button>
-          <button type="button" class="build-product ${animalPenBuilt || !canBuildAnimalPen() ? "is-disabled" : ""}" data-build-animal-pen aria-disabled="${animalPenBuilt || !canBuildAnimalPen() ? "true" : "false"}">
-            <span class="build-product__main">
-              <span class="build-product__name">${animalPenLabel}</span>
-            </span>
-            ${animalPenBuilt ? "" : `<span class="build-product__cost">Wood ${wood}/20 - Nails ${nails}/10</span>`}
-          </button>
+          ${buildProducts.map(renderBuildProduct).join("")}
         </div>
       </section>
     `;

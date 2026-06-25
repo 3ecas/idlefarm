@@ -3,9 +3,13 @@ import { deleteCellByKey, moveCell, moveFarmPlot, state } from "./state.js";
 const GRID_SIZE = 24;
 const DRAG_THRESHOLD = 4;
 const EDGE_SNAP_DISTANCE = 14;
+const STARTING_FRONT_LAYER = 40;
 
 let dragState = null;
+let topLayer = STARTING_FRONT_LAYER;
+let layerSyncQueued = false;
 const recentDraggedKeys = new Map();
+const cellLayers = new Map();
 
 function markRecentlyDragged(key) {
   recentDraggedKeys.set(key, Date.now());
@@ -71,6 +75,37 @@ function getWorkspaceRect(workspace, element) {
 
 function isFarmPlotKey(key) {
   return typeof key === "string" && key.startsWith("farm-plot-");
+}
+
+function applyStoredLayers() {
+  layerSyncQueued = false;
+  for (const cell of document.querySelectorAll("[data-cell-key]")) {
+    const layer = cellLayers.get(cell.dataset.cellKey);
+    if (Number.isFinite(layer)) {
+      cell.style.zIndex = String(layer);
+    }
+  }
+}
+
+function queueLayerSync() {
+  if (layerSyncQueued) {
+    return;
+  }
+
+  layerSyncQueued = true;
+  window.requestAnimationFrame(applyStoredLayers);
+}
+
+function bringCellToFront(cell) {
+  const key = cell.dataset.cellKey;
+  if (!key) {
+    return;
+  }
+
+  topLayer += 1;
+  cellLayers.set(key, topLayer);
+  cell.style.zIndex = String(topLayer);
+  queueLayerSync();
 }
 
 function getDeleteZoneRect() {
@@ -189,10 +224,6 @@ export function mountMovableCell(container, { key, selector, dragHandle = null, 
       return;
     }
 
-    if (state.ui.activeTool !== "hand") {
-      return;
-    }
-
     const interactiveAncestor = event.target.closest("button, summary, input, textarea, select, a, label");
     if (interactiveAncestor && interactiveAncestor !== cell) {
       return;
@@ -209,6 +240,8 @@ export function mountMovableCell(container, { key, selector, dragHandle = null, 
     if (!workspace) {
       return;
     }
+
+    bringCellToFront(cell);
 
     const startLeft = getElementOffset(cell, "left");
     const startTop = getElementOffset(cell, "top");
@@ -316,6 +349,7 @@ export function mountMovableCell(container, { key, selector, dragHandle = null, 
     }
 
     if (typeof onDrop === "function" && onDrop(snapshot, settledPosition) === true) {
+      queueLayerSync();
       if (snapshot.key === "market") {
         window.dispatchEvent(new Event("idle-farm-market-moved"));
       }
@@ -326,6 +360,7 @@ export function mountMovableCell(container, { key, selector, dragHandle = null, 
     if (snapshot.key in state.cells) {
       moveCell(snapshot.key, settledPosition.left, settledPosition.top);
     }
+    queueLayerSync();
     if (snapshot.key === "market") {
       window.dispatchEvent(new Event("idle-farm-market-moved"));
     }
@@ -351,6 +386,7 @@ export function mountMovableCell(container, { key, selector, dragHandle = null, 
     } else if (isFarmPlotKey(snapshot.key)) {
       moveFarmPlot(snapshot.key, snapshot.startLeft, snapshot.startTop);
     }
+    queueLayerSync();
     if (snapshot.key === "market") {
       window.dispatchEvent(new Event("idle-farm-market-moved"));
     }

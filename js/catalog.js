@@ -24,6 +24,8 @@ export const PRODUCTS = {
   ...PROCESSED_GOODS,
 };
 
+export const ALL_PRODUCTS = Object.values(PRODUCTS);
+
 export const SHOP_SECTIONS = [
   {
     key: "seeds",

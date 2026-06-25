@@ -48,12 +48,6 @@ body.is-dragging-cell * {
   -webkit-user-select: none;
 }
 
-body.is-hand-tool-active [data-cell-key],
-body.is-hand-tool-active [data-cell-key] * {
-  user-select: none;
-  -webkit-user-select: none;
-}
-
 body.is-dragging-cell {
   cursor: grabbing;
 }
@@ -385,6 +379,7 @@ body.is-dragging-cell {
   align-items: center;
   justify-content: space-between;
   min-height: 22px;
+  cursor: grab;
 }
 
 .menu-title,
@@ -451,6 +446,7 @@ body.is-dragging-cell {
   justify-content: space-between;
   gap: 8px;
   min-height: 22px;
+  cursor: grab;
 }
 
 .market-title {
@@ -463,6 +459,7 @@ body.is-dragging-cell {
 
 .market-title__icon,
 .money-title__icon,
+.fast-items-title__icon,
 .tools-title__icon,
 .build-title__icon,
 .mill-title__icon,
@@ -516,6 +513,7 @@ body.is-dragging-cell {
   align-items: center;
   justify-content: space-between;
   min-height: 22px;
+  cursor: grab;
 }
 
 .money-title {
@@ -527,15 +525,24 @@ body.is-dragging-cell {
 }
 
 .money-body {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 6px;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
   padding: 5px 7px;
   border: 1px solid rgba(127, 196, 127, 0.18);
   border-radius: 10px;
   background: #fafdf8;
   font-size: 0.8rem;
   font-weight: 700;
+}
+
+.money-body__value {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
 }
 
 .money-coin {
@@ -553,13 +560,16 @@ body.is-dragging-cell {
 }
 
 .money-add {
-  width: 100%;
-  padding: 2px 0 3px;
+  flex: 0 0 auto;
+  min-width: 18px;
+  width: 18px;
+  height: 18px;
+  padding: 0;
   border: 1px solid rgba(127, 196, 127, 0.22);
   border-radius: 999px;
   background: #f3f9ef;
   color: var(--foreground);
-  font-size: 0.85rem;
+  font-size: 0.78rem;
   font-weight: 700;
   cursor: pointer;
   transition: transform 0.12s ease, border-color 0.12s ease, background-color 0.12s ease;
@@ -644,7 +654,7 @@ body.is-dragging-cell {
   width: 100%;
   min-width: 0;
   aspect-ratio: 1 / 1;
-  min-height: 68px;
+  min-height: 62px;
   padding: 4px;
   border: 1px solid rgba(127, 196, 127, 0.18);
   border-radius: 10px;
@@ -664,7 +674,7 @@ body.is-dragging-cell {
 
 .market-product__name {
   min-width: 0;
-  font-size: 0.64rem;
+  font-size: 0.6rem;
   font-weight: 700;
   white-space: normal;
   overflow: hidden;
@@ -682,24 +692,10 @@ body.is-dragging-cell {
   gap: 4px;
   justify-content: center;
   flex: 0 0 auto;
-  font-size: 0.58rem;
+  font-size: 0.55rem;
   color: var(--muted);
   line-height: 1;
   white-space: nowrap;
-}
-
-.market-item__name {
-  font-size: 0.78rem;
-  font-weight: 700;
-}
-
-.market-item__price {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 0.68rem;
-  color: var(--muted);
-  line-height: 1;
 }
 
 .price-coin {
@@ -719,14 +715,16 @@ body.is-dragging-cell {
 .build-cell,
 .mill-cell,
 .bakery-cell,
+.animal-feeder-cell,
 .animal-pen-cell,
 .shopping-cell,
-.barn-cell {
+.barn-cell,
+.fast-items-cell {
   position: absolute;
   display: flex;
   flex-direction: column;
   gap: 6px;
-  width: 176px;
+  width: 320px;
   min-height: 0;
   padding: 8px;
   border: 1.5px dashed rgba(127, 196, 127, 0.6);
@@ -740,7 +738,7 @@ body.is-dragging-cell {
 
 .build-cell,
 .mill-cell {
-  width: 176px;
+  width: 192px;
 }
 
 .mill-cell {
@@ -748,16 +746,26 @@ body.is-dragging-cell {
 }
 
 .bakery-cell {
-  width: 176px;
+  width: 192px;
   min-height: 156px;
+}
+
+.animal-feeder-cell {
+  width: 192px;
+  min-height: 190px;
 }
 
 .shopping-cell {
   cursor: default;
   touch-action: auto;
+  min-height: 72px;
 }
 
 .barn-cell {
+  cursor: default;
+}
+
+.fast-items-cell {
   cursor: default;
 }
 
@@ -769,29 +777,39 @@ body.is-dragging-cell {
 .build-cell.is-dragging,
 .mill-cell.is-dragging,
 .bakery-cell.is-dragging,
+.animal-feeder-cell.is-dragging,
 .animal-pen-cell.is-dragging,
 .barn-cell.is-dragging {
+  cursor: grabbing;
+}
+
+.fast-items-cell.is-dragging {
   cursor: grabbing;
 }
 
 .build-header,
 .mill-header,
 .bakery-header,
+.animal-feeder-header,
 .animal-pen-header,
 .shopping-header,
-.barn-header {
+.barn-header,
+.fast-items-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   min-height: 22px;
+  cursor: grab;
 }
 
 .build-title,
 .mill-title,
 .bakery-title,
+.animal-feeder-title,
 .animal-pen-title,
 .shopping-title,
-.barn-title {
+.barn-title,
+.fast-items-title {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -804,8 +822,15 @@ body.is-dragging-cell {
   line-height: 1;
 }
 
+.animal-feeder-title__icon {
+  font-size: 0.58rem;
+  line-height: 1;
+  color: var(--muted);
+}
+
 .market-toggle,
-.barn-toggle {
+.barn-toggle,
+.shopping-toggle {
   padding: 0;
   border: 0;
   background: transparent;
@@ -814,12 +839,154 @@ body.is-dragging-cell {
   cursor: pointer;
 }
 
+.shopping-toggle {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  line-height: 1;
+  transition: background-color 0.12s ease, color 0.12s ease, transform 0.12s ease;
+}
+
+.shopping-toggle:hover,
+.shopping-toggle:focus-visible {
+  background: rgba(127, 196, 127, 0.14);
+  color: var(--foreground);
+  transform: translateY(-1px);
+}
+
+.shopping-header {
+  gap: 8px;
+}
+
 .build-body,
 .mill-body,
+.animal-feeder-body,
 .shopping-body,
-.barn-body {
+.barn-body,
+.fast-items-body {
   display: grid;
   gap: 6px;
+}
+
+.inventory-tabs {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 4px;
+  width: 100%;
+}
+
+.inventory-tab {
+  min-width: 0;
+  min-height: 24px;
+  padding: 3px 6px;
+  border: 1px solid rgba(127, 196, 127, 0.18);
+  border-radius: 8px;
+  background: #f7fbf4;
+  color: var(--foreground);
+  font-size: 0.56rem;
+  font-weight: 700;
+  text-align: center;
+  line-height: 1.05;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.12s ease, background-color 0.12s ease;
+}
+
+.inventory-tab:hover,
+.inventory-tab:focus-visible,
+.inventory-tab.is-selected {
+  transform: translateY(-1px);
+  border-color: rgba(127, 196, 127, 0.4);
+  background: #eaf6e0;
+}
+
+.inventory-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(40px, 1fr));
+  gap: 3px;
+}
+
+.inventory-empty {
+  display: grid;
+  place-items: center;
+  min-height: 34px;
+  border: 1px dashed rgba(127, 196, 127, 0.28);
+  border-radius: 10px;
+  color: var(--muted);
+  font-size: 0.56rem;
+  font-weight: 700;
+}
+
+.inventory-tile {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 1px;
+  width: 100%;
+  min-width: 0;
+  aspect-ratio: 1 / 1;
+  min-height: 34px;
+  padding: 2px;
+  border: 1px solid rgba(127, 196, 127, 0.18);
+  border-radius: 10px;
+  background: #fdfefd;
+  color: var(--foreground);
+  cursor: grab;
+  text-align: center;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-user-drag: none;
+  transition: transform 0.12s ease, border-color 0.12s ease, background-color 0.12s ease;
+}
+
+button.inventory-tile:hover,
+button.inventory-tile:focus-visible,
+button.inventory-tile.is-selected {
+  transform: translateY(-1px);
+  border-color: rgba(127, 196, 127, 0.4);
+  background: #eaf6e0;
+}
+
+button.inventory-tile:active,
+button.inventory-tile.is-dragging {
+  cursor: grabbing;
+}
+
+.inventory-tile__name {
+  min-width: 0;
+  font-size: 0.5rem;
+  font-weight: 700;
+  line-height: 0.95;
+  overflow: hidden;
+  text-overflow: clip;
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+}
+
+.inventory-tile__meta {
+  font-size: 0.46rem;
+  color: var(--muted);
+  line-height: 1;
+}
+
+.inventory-tile__action {
+  font-size: 0.48rem;
+  line-height: 1;
+  color: var(--muted);
+}
+
+.inventory-tile--static {
+  cursor: default;
+}
+
+.inventory-tile--ghost {
+  opacity: 0.96;
+  transform: scale(1.02);
+  box-shadow: 0 10px 24px rgba(85, 64, 120, 0.12);
 }
 
 .build-product,
@@ -847,6 +1014,53 @@ body.is-dragging-cell {
 .mill-action.is-disabled {
   opacity: 0.58;
   transform: none;
+}
+
+.animal-feeder-slot {
+  display: grid;
+  align-items: center;
+  gap: 2px;
+  width: 100%;
+  min-height: 31px;
+  padding: 5px 8px;
+  border: 1px solid rgba(127, 196, 127, 0.18);
+  border-radius: 10px;
+  background: #fafdf8;
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: transform 0.12s ease, border-color 0.12s ease, background-color 0.12s ease;
+}
+
+.animal-feeder-slot:hover,
+.animal-feeder-slot:focus-visible {
+  transform: translateY(-1px);
+  border-color: rgba(127, 196, 127, 0.34);
+  background: #fbfef8;
+}
+
+.animal-feeder-slot.is-selected {
+  border-color: rgba(79, 139, 203, 0.36);
+  background: #f4f9ff;
+}
+
+.animal-feeder-slot__name,
+.animal-feeder-slot__status {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.1;
+}
+
+.animal-feeder-slot__name {
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.animal-feeder-slot__status {
+  font-size: 0.64rem;
+  font-weight: 700;
+  color: var(--muted);
 }
 
 .build-product__main,
@@ -899,7 +1113,7 @@ body.is-dragging-cell {
 }
 
 .animal-pen-cell {
-  width: 208px;
+  width: 192px;
   min-height: 196px;
   z-index: 12;
 }
@@ -1152,6 +1366,7 @@ body.is-dragging-cell {
 }
 
 .shopping-item,
+.shopping-empty,
 .inventory-item {
   display: flex;
   align-items: center;
@@ -1161,6 +1376,13 @@ body.is-dragging-cell {
   border: 1px solid rgba(127, 196, 127, 0.18);
   border-radius: 10px;
   background: #fafdf8;
+}
+
+.shopping-empty {
+  justify-content: center;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
 }
 
 button.inventory-item {
@@ -1190,32 +1412,6 @@ button.inventory-item.is-dragging {
 
 button.inventory-item.is-dragging:not(.inventory-item--ghost) {
   opacity: 0;
-}
-
-body.is-hand-tool-active .farm-cell,
-body.is-hand-tool-active .market-header,
-body.is-hand-tool-active .money-header,
-body.is-hand-tool-active .menu-header,
-body.is-hand-tool-active .build-header,
-body.is-hand-tool-active .mill-header,
-body.is-hand-tool-active .bakery-header,
-body.is-hand-tool-active .tools-header,
-body.is-hand-tool-active .barn-header,
-body.is-hand-tool-active .animal-pen-header {
-  cursor: grab;
-}
-
-body.is-hand-tool-active .farm-cell.is-dragging,
-body.is-hand-tool-active .market-cell.is-dragging,
-body.is-hand-tool-active .money-cell.is-dragging,
-body.is-hand-tool-active .menu-cell.is-dragging,
-body.is-hand-tool-active .build-cell.is-dragging,
-body.is-hand-tool-active .mill-cell.is-dragging,
-body.is-hand-tool-active .bakery-cell.is-dragging,
-body.is-hand-tool-active .tools-cell.is-dragging,
-body.is-hand-tool-active .barn-cell.is-dragging,
-body.is-hand-tool-active .animal-pen-cell.is-dragging {
-  cursor: grabbing;
 }
 
 .shopping-item__name,
