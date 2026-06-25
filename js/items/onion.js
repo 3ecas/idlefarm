@@ -13,9 +13,9 @@ const crop = {
   marketName: "Onion",
   inventoryName: "Onion",
   price: 0,
-  sellPrice: 4,
-  growDurationMs: 20000,
-  harvestYield: 1,
+  sellPrice: 1,
+  growDurationMs: 82000,
+  harvestYield: 3,
 };
 
 export const onion = {

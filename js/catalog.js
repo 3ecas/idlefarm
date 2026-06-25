@@ -59,3 +59,25 @@ export function getProductSellPrice(productId) {
   const product = getProduct(productId);
   return product?.sellPrice || 0;
 }
+
+export function getProductBuyPrice(product) {
+  const price = Number(product?.price);
+  return Number.isFinite(price) ? price : 0;
+}
+
+export function getProductCoinValue(product) {
+  const sellPrice = Number(product?.sellPrice);
+  if (Number.isFinite(sellPrice) && sellPrice > 0) {
+    return sellPrice;
+  }
+
+  return getProductBuyPrice(product);
+}
+
+export function sortProductsByBuyPrice(first, second) {
+  return getProductBuyPrice(first) - getProductBuyPrice(second) || first.marketName.localeCompare(second.marketName);
+}
+
+export function sortProductsByCoinValue(first, second) {
+  return getProductCoinValue(first) - getProductCoinValue(second) || first.inventoryName.localeCompare(second.inventoryName);
+}

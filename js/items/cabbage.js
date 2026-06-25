@@ -13,8 +13,8 @@ const crop = {
   marketName: "Cabbage",
   inventoryName: "Cabbage",
   price: 0,
-  sellPrice: 3,
-  growDurationMs: 18000,
+  sellPrice: 2,
+  growDurationMs: 16000,
   harvestYield: 2,
 };
 

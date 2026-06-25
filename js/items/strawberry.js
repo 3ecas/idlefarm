@@ -3,7 +3,7 @@ const seed = {
   category: "seeds",
   marketName: "Strawberry",
   inventoryName: "Strawberry seed",
-  price: 3,
+  price: 2,
   cropProductId: "strawberryCrop",
 };
 
@@ -13,8 +13,8 @@ const crop = {
   marketName: "Strawberry",
   inventoryName: "Strawberry",
   price: 0,
-  sellPrice: 4,
-  growDurationMs: 30000,
+  sellPrice: 3,
+  growDurationMs: 34000,
   harvestYield: 1,
 };
 

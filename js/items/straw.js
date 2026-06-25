@@ -13,7 +13,7 @@ const crop = {
   marketName: "Straw",
   inventoryName: "Straw",
   price: 0,
-  sellPrice: 1,
+  sellPrice: 0,
   growDurationMs: 15000,
   harvestYield: 2,
 };

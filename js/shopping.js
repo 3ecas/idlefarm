@@ -1,4 +1,4 @@
-import { getProduct } from "./catalog.js";
+import { getProduct, sortProductsByBuyPrice } from "./catalog.js";
 import { hideCell, isCellHidden, onStateChange, purchaseShoppingList, removeShoppingItem, setMessage, state, showCell } from "./state.js";
 
 const SHOPPING_WIDTH = 176;
@@ -58,7 +58,8 @@ function getShoppingEntries() {
       const product = getProduct(productId);
       return product && quantity > 0 ? { product, quantity } : null;
     })
-    .filter(Boolean);
+    .filter(Boolean)
+    .sort((first, second) => sortProductsByBuyPrice(first.product, second.product));
 }
 
 export function isShoppingListOpen() {

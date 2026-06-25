@@ -1,4 +1,4 @@
-import { getProduct } from "./catalog.js";
+import { getProduct, sortProductsByCoinValue } from "./catalog.js";
 import {
   addAnimalFoodToPen,
   addAnimalToPen,
@@ -15,6 +15,7 @@ import { getInventoryEntries, handleInventorySelection, isSelectedInventoryItem 
 import { mountMovableCell } from "./drag.js";
 import { addProductToSellStand, getSellCellFromPoint } from "./sell.js";
 import { getAnimalPenDropTargetFromPoint } from "./animalPen.js";
+import { getChickenCoopDropTargetFromPoint } from "./chickenCoop.js";
 import {
   getPanelCategory,
   getPanelTab,
@@ -22,6 +23,7 @@ import {
   renderPanelTabButtons,
   setPanelTab,
 } from "./inventoryPanel.js";
+import { attachSeedInfoTooltip } from "./seedInfoTooltip.js";
 
 const DRAG_THRESHOLD = 4;
 const DRAG_SUPPRESS_MS = 300;
@@ -175,6 +177,11 @@ function handleSeedDragPointerUp(event) {
     if (penTarget === "animals") {
       addAnimalToPen(snapshot.productId);
     }
+  } else if (snapshot.target === "chickenCoop") {
+    const penTarget = getChickenCoopDropTargetFromPoint(event.clientX, event.clientY);
+    if (penTarget === "animals") {
+      addAnimalToPen(snapshot.productId);
+    }
   } else if (snapshot.target === "animalFood") {
     const penTarget = getAnimalPenDropTargetFromPoint(event.clientX, event.clientY);
     if (penTarget === "food") {
@@ -206,7 +213,7 @@ function getPanelEntries(entries, activeTab) {
   const category = getPanelCategory(activeTab);
   return entries
     .filter(({ product }) => product.category === category)
-    .sort((first, second) => first.product.inventoryName.localeCompare(second.product.inventoryName));
+    .sort((first, second) => sortProductsByCoinValue(first.product, second.product));
 }
 
 function renderBarnTile(product, quantity) {
@@ -214,13 +221,15 @@ function renderBarnTile(product, quantity) {
   const isAnimal = product.category === "animals";
   const isSellable = isSellableProduct(product);
   const isInteractive = isSeed || isAnimal || isSellable;
+  const itemInfoAttribute = ` data-item-info-product="${product.id}"`;
   const dataAttributes = isSeed || isAnimal || isSellable
-    ? `data-inventory-product="${product.id}"${isSellable ? ` data-sell-product="${product.id}"` : ""}`
-    : "";
+    ? `data-inventory-product="${product.id}"${itemInfoAttribute}${isSellable ? ` data-sell-product="${product.id}"` : ""}`
+    : itemInfoAttribute;
 
   return renderInventoryTile({
     title: product.inventoryName,
     meta: `x${quantity}`,
+    className: "barn-inventory-tile",
     dataAttributes,
     isSelected: isSelectedInventoryItem(product.id),
     isStatic: !isInteractive,
@@ -229,6 +238,8 @@ function renderBarnTile(product, quantity) {
 }
 
 export function mountBarn(container) {
+  const seedInfoTooltip = attachSeedInfoTooltip(container);
+
   mountMovableCell(container, {
     key: PANEL_KEY,
     selector: "[data-barn-cell]",
@@ -243,6 +254,7 @@ export function mountBarn(container) {
     const closeButton = event.target.closest("[data-close-cell]");
     if (closeButton) {
       event.preventDefault();
+      seedInfoTooltip.hide();
       hideCell("barn");
       setMessage("Barn closed.");
       return;
@@ -251,6 +263,7 @@ export function mountBarn(container) {
     const tabButton = event.target.closest("[data-inventory-tab]");
     if (tabButton) {
       event.preventDefault();
+      seedInfoTooltip.hide();
       setPanelTab(PANEL_KEY, tabButton.dataset.inventoryTab);
       render();
       return;
@@ -286,7 +299,7 @@ export function mountBarn(container) {
     if (product.category === "seeds") {
       target = "farm";
     } else if (product.category === "animals") {
-      target = "animalPen";
+      target = product.penBuildingId === "chickenCoop" ? "chickenCoop" : "animalPen";
     } else if (product.id === "strawCrop") {
       target = "animalFood";
     } else if (isSellableProduct(product)) {
@@ -326,6 +339,7 @@ export function mountBarn(container) {
 
     if (isCellHidden("barn")) {
       barnWasHidden = true;
+      seedInfoTooltip.hide();
       container.innerHTML = "";
       return;
     }

@@ -10,9 +10,10 @@ import {
   setMessage,
   state,
 } from "./state.js";
-import { SHOP_SECTIONS, getProduct } from "./catalog.js";
+import { SHOP_SECTIONS, getProduct, sortProductsByBuyPrice } from "./catalog.js";
 import { mountMovableCell } from "./drag.js";
 import { isShoppingListOpen, toggleShoppingList } from "./shopping.js";
+import { attachSeedInfoTooltip } from "./seedInfoTooltip.js";
 
 let activeShopTab = "seeds";
 
@@ -29,7 +30,7 @@ function clampToWorkspace(workspace, left, top) {
 
 function renderProductButton(product) {
   return `
-    <button type="button" class="market-product" data-product-id="${product.id}">
+    <button type="button" class="market-product" data-product-id="${product.id}" data-item-info-product="${product.id}">
       <span class="market-product__name">${product.marketName}</span>
       <span class="market-product__price">
         <span class="price-coin" aria-hidden="true"></span>
@@ -80,6 +81,8 @@ function renderMarketTab(section) {
 }
 
 export function mountMarket(container) {
+  const seedInfoTooltip = attachSeedInfoTooltip(container);
+
   mountMovableCell(container, {
     key: "market",
     selector: "[data-market-cell]",
@@ -101,8 +104,9 @@ export function mountMarket(container) {
     const closeButton = event.target.closest("[data-close-cell]");
     if (closeButton) {
       event.preventDefault();
+      seedInfoTooltip.hide();
       hideCell("market");
-      setMessage("Market stand closed.");
+      setMessage("Shop closed.");
       return;
     }
 
@@ -122,6 +126,7 @@ export function mountMarket(container) {
     if (tabButton) {
       event.preventDefault();
       activeShopTab = tabButton.dataset.marketTab;
+      seedInfoTooltip.hide();
       render();
       return;
     }
@@ -129,6 +134,7 @@ export function mountMarket(container) {
 
   function render() {
     if (isCellHidden("market")) {
+      seedInfoTooltip.hide();
       container.innerHTML = "";
       return;
     }
@@ -142,18 +148,19 @@ export function mountMarket(container) {
     const selectedSection = SHOP_SECTIONS.find((section) => section.key === activeShopTab) || SHOP_SECTIONS[0];
     const selectedProducts = (selectedSection?.productIds || [])
       .map((productId) => getProduct(productId))
-      .filter(Boolean);
+      .filter(Boolean)
+      .sort(sortProductsByBuyPrice);
     let selectedContent = selectedProducts.map((product) => renderProductButton(product)).join("");
     if (selectedSection.key === "farmUpgrades") {
       selectedContent = `${renderLandPlotButton()}${selectedContent}`;
     }
 
     container.innerHTML = `
-      <section class="market-cell is-open" data-cell-key="market" data-market-cell style="left:${position.left}px; top:${position.top}px;" aria-label="Market stand">
+      <section class="market-cell is-open" data-cell-key="market" data-market-cell style="left:${position.left}px; top:${position.top}px;" aria-label="Shop">
         <div class="market-header">
           <span class="market-title">
             <span class="market-title__icon" aria-hidden="true">🛒</span>
-            <span class="market-title__text">Market stand</span>
+            <span class="market-title__text">Shop</span>
           </span>
           <div class="cell-header-actions">
             <button
@@ -165,11 +172,11 @@ export function mountMarket(container) {
             >
               ${isShoppingListOpen() ? "-" : "+"}
             </button>
-            <button type="button" class="cell-close" data-close-cell aria-label="Close Market stand">x</button>
+            <button type="button" class="cell-close" data-close-cell aria-label="Close Shop">x</button>
           </div>
         </div>
         <div class="market-body">
-          <div class="market-tabs" role="tablist" aria-label="Market stand sections">
+          <div class="market-tabs" role="tablist" aria-label="Shop sections">
             ${SHOP_SECTIONS.map(renderMarketTab).join("")}
           </div>
           <div class="market-tab-panel market-${selectedSection.key}" role="tabpanel">

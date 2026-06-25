@@ -359,7 +359,8 @@ body.is-dragging-cell {
 }
 
 .menu-cell {
-  width: 280px;
+  width: 420px;
+  max-width: calc(100vw - 32px);
   z-index: 30;
 }
 
@@ -397,6 +398,12 @@ body.is-dragging-cell {
   gap: 6px;
 }
 
+.menu-body {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 1px;
+}
+
 .menu-button,
 .tool-button {
   flex: 1 1 0;
@@ -412,21 +419,29 @@ body.is-dragging-cell {
 }
 
 .menu-button {
-  display: grid;
-  place-items: center;
-  gap: 1px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 0;
+  gap: 5px;
+  padding: 0 10px;
   font-size: 0.72rem;
   font-weight: 700;
 }
 
 .menu-button__icon {
+  flex: 0 0 auto;
   font-size: 0.74rem;
   line-height: 1;
 }
 
 .menu-button__label {
-  font-size: 0.58rem;
+  min-width: 0;
+  font-size: 0.64rem;
   line-height: 1;
+  white-space: nowrap;
 }
 
 .menu-button:hover,
@@ -626,8 +641,8 @@ body.is-dragging-cell {
 
 .market-tab-panel {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(68px, 1fr));
-  gap: 3px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
   padding: 5px 6px 6px;
   border: 1px solid rgba(127, 196, 127, 0.18);
   border-radius: 12px;
@@ -647,20 +662,19 @@ body.is-dragging-cell {
 
 .market-product {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  justify-content: center;
-  gap: 2px;
+  justify-content: space-between;
+  gap: 8px;
   width: 100%;
   min-width: 0;
-  aspect-ratio: 1 / 1;
-  min-height: 62px;
-  padding: 4px;
+  min-height: 34px;
+  padding: 7px 8px;
   border: 1px solid rgba(127, 196, 127, 0.18);
-  border-radius: 10px;
+  border-radius: 9px;
   background: #fff;
   cursor: pointer;
-  text-align: center;
+  text-align: left;
   touch-action: manipulation;
   transition: transform 0.12s ease, border-color 0.12s ease, background-color 0.12s ease;
 }
@@ -674,25 +688,21 @@ body.is-dragging-cell {
 
 .market-product__name {
   min-width: 0;
-  font-size: 0.6rem;
+  font-size: 0.64rem;
   font-weight: 700;
-  white-space: normal;
+  white-space: nowrap;
   overflow: hidden;
-  text-overflow: clip;
+  text-overflow: ellipsis;
   line-height: 1;
-  word-break: break-word;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
 }
 
 .market-product__price {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  justify-content: center;
+  justify-content: flex-end;
   flex: 0 0 auto;
-  font-size: 0.55rem;
+  font-size: 0.6rem;
   color: var(--muted);
   line-height: 1;
   white-space: nowrap;
@@ -710,6 +720,50 @@ body.is-dragging-cell {
 
 .price-value {
   font-weight: 700;
+}
+
+.seed-info-tooltip {
+  position: fixed;
+  z-index: 1000;
+  width: 172px;
+  padding: 8px;
+  border: 1px solid rgba(127, 196, 127, 0.28);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 12px 30px rgba(85, 64, 120, 0.14);
+  pointer-events: none;
+}
+
+.seed-info-tooltip__title {
+  margin-bottom: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.seed-info-tooltip__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+  font-size: 0.58rem;
+  line-height: 1.1;
+}
+
+.seed-info-tooltip__row span {
+  color: var(--muted);
+}
+
+.seed-info-tooltip__row strong {
+  max-width: 96px;
+  overflow: hidden;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .build-cell,
@@ -907,6 +961,16 @@ body.is-dragging-cell {
   gap: 3px;
 }
 
+.barn-cell .inventory-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.fast-items-cell .inventory-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+}
+
 .inventory-empty {
   display: grid;
   place-items: center;
@@ -987,6 +1051,33 @@ button.inventory-tile.is-dragging {
   opacity: 0.96;
   transform: scale(1.02);
   box-shadow: 0 10px 24px rgba(85, 64, 120, 0.12);
+}
+
+.barn-inventory-tile {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  aspect-ratio: auto;
+  min-height: 34px;
+  padding: 7px 8px;
+  text-align: left;
+}
+
+.barn-inventory-tile .inventory-tile__name {
+  min-width: 0;
+  font-size: 0.64rem;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
+}
+
+.barn-inventory-tile .inventory-tile__meta {
+  flex: 0 0 auto;
+  font-size: 0.6rem;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .build-product,

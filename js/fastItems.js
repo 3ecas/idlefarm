@@ -1,7 +1,8 @@
-import { ALL_PRODUCTS, getProduct } from "./catalog.js";
+import { ALL_PRODUCTS, getProduct, sortProductsByCoinValue } from "./catalog.js";
 import { addBarnItem, getCellDragBounds, hideCell, isCellHidden, moveCell, onStateChange, setMessage, state } from "./state.js";
 import { mountMovableCell } from "./drag.js";
 import { getPanelCategory, getPanelTab, renderInventoryTile, renderPanelTabButtons, setPanelTab } from "./inventoryPanel.js";
+import { attachSeedInfoTooltip } from "./seedInfoTooltip.js";
 
 const PANEL_KEY = "fastItems";
 const PANEL_TITLE = "Fast Items";
@@ -25,19 +26,21 @@ function getPanelEntries(activeTab) {
   const category = getPanelCategory(activeTab);
   return ALL_PRODUCTS
     .filter((product) => product.category === category)
-    .sort((first, second) => first.inventoryName.localeCompare(second.inventoryName));
+    .sort(sortProductsByCoinValue);
 }
 
 function renderFastItemTile(product) {
   return renderInventoryTile({
     title: product.inventoryName,
     action: "+1",
-    dataAttributes: `data-fast-item-product="${product.id}"`,
+    dataAttributes: `data-fast-item-product="${product.id}" data-item-info-product="${product.id}"`,
     ariaLabel: `Add ${product.inventoryName}`,
   });
 }
 
 export function mountFastItems(container) {
+  const seedInfoTooltip = attachSeedInfoTooltip(container);
+
   mountMovableCell(container, {
     key: PANEL_KEY,
     selector: "[data-fast-items-cell]",
@@ -52,6 +55,7 @@ export function mountFastItems(container) {
     const closeButton = event.target.closest("[data-close-cell]");
     if (closeButton) {
       event.preventDefault();
+      seedInfoTooltip.hide();
       hideCell("fastItems");
       setMessage("Fast items closed.");
       return;
@@ -60,6 +64,7 @@ export function mountFastItems(container) {
     const tabButton = event.target.closest("[data-inventory-tab]");
     if (tabButton) {
       event.preventDefault();
+      seedInfoTooltip.hide();
       setPanelTab(PANEL_KEY, tabButton.dataset.inventoryTab);
       render();
       return;
@@ -80,6 +85,7 @@ export function mountFastItems(container) {
 
   function render() {
     if (isCellHidden("fastItems")) {
+      seedInfoTooltip.hide();
       container.innerHTML = "";
       return;
     }

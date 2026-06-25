@@ -2,10 +2,12 @@ import {
   buildBakery,
   buildAnimalFeeder,
   buildAnimalPen,
+  buildChickenCoop,
   buildMill,
   canBuildBakery,
   canBuildAnimalFeeder,
   canBuildAnimalPen,
+  canBuildChickenCoop,
   canBuildMill,
   getBarnItemQuantity,
   getCellDragBounds,
@@ -90,6 +92,13 @@ export function mountBuild(container) {
     if (animalPenButton) {
       event.preventDefault();
       buildAnimalPen();
+      return;
+    }
+
+    const chickenCoopButton = event.target.closest("[data-build-chicken-coop]");
+    if (chickenCoopButton) {
+      event.preventDefault();
+      buildChickenCoop();
     }
   });
 
@@ -108,19 +117,21 @@ export function mountBuild(container) {
     const bakeryBuilt = isBuildingBuilt("bakery");
     const animalFeederBuilt = isBuildingBuilt("animalFeeder");
     const animalPenBuilt = isBuildingBuilt("animalPen");
+    const chickenCoopBuilt = isBuildingBuilt("chickenCoop");
     const wood = getBarnItemQuantity("wood");
     const nails = getBarnItemQuantity("nails");
     const millLabel = millBuilt ? "Already Built" : "Mill";
     const bakeryLabel = bakeryBuilt ? "Already Built" : "Bakery";
     const animalFeederLabel = animalFeederBuilt ? "Already Built" : "Animal Feeder";
     const animalPenLabel = animalPenBuilt ? "Already Built" : "Cow Pen";
+    const chickenCoopLabel = chickenCoopBuilt ? "Already Built" : "Chicken Coop";
     const buildProducts = [
       {
         label: millLabel,
         isBuilt: millBuilt,
         canBuild: canBuildMill(),
-        totalCost: 20,
-        costLabel: `Wood ${wood}/15 - Nails ${nails}/5`,
+        totalCost: 25,
+        costLabel: `Wood ${wood}/25`,
         dataAttribute: "data-build-mill",
       },
       {
@@ -135,17 +146,25 @@ export function mountBuild(container) {
         label: animalFeederLabel,
         isBuilt: animalFeederBuilt,
         canBuild: canBuildAnimalFeeder(),
-        totalCost: 15,
-        costLabel: `Wood ${wood}/10 - Nails ${nails}/5`,
+        totalCost: 150,
+        costLabel: `Wood ${wood}/125 - Nails ${nails}/25`,
         dataAttribute: "data-build-animal-feeder",
       },
       {
         label: animalPenLabel,
         isBuilt: animalPenBuilt,
         canBuild: canBuildAnimalPen(),
-        totalCost: 30,
-        costLabel: `Wood ${wood}/20 - Nails ${nails}/10`,
+        totalCost: 75,
+        costLabel: `Wood ${wood}/75`,
         dataAttribute: "data-build-animal-pen",
+      },
+      {
+        label: chickenCoopLabel,
+        isBuilt: chickenCoopBuilt,
+        canBuild: canBuildChickenCoop(),
+        totalCost: 50,
+        costLabel: `Wood ${wood}/50`,
+        dataAttribute: "data-build-chicken-coop",
       },
     ].sort(sortBuildProductsByCost);
 

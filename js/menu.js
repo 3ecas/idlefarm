@@ -2,17 +2,17 @@ import { getCellDragBounds, hideCell, isCellHidden, moveCell, onStateChange, set
 import { mountMovableCell } from "./drag.js";
 
 const MENU_ITEMS = [
-  { key: "market", label: "Market", icon: "🛒" },
+  { key: "market", label: "Shop", icon: "🛒" },
   { key: "sellMarket", label: "Market", icon: "⚖" },
   { key: "barn", label: "Barn", icon: "📦" },
   { key: "fastItems", label: "Fast items", icon: "Fx" },
-  { key: "money", label: "Money", icon: "🪙" },
   { key: "build", label: "Build", icon: "🔨" },
 ];
 
 function clampToWorkspace(workspace, left, top) {
   const bounds = getCellDragBounds("menu");
-  const maxLeft = Math.max(0, workspace.clientWidth - bounds.width);
+  const width = Math.min(bounds.width, Math.max(0, workspace.clientWidth - 32));
+  const maxLeft = Math.max(0, workspace.clientWidth - width);
   const maxTop = Math.max(0, workspace.clientHeight - bounds.height);
 
   return {

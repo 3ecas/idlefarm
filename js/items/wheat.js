@@ -14,8 +14,11 @@ const crop = {
   inventoryName: "Wheat",
   price: 0,
   sellPrice: 2,
-  growDurationMs: 10000,
+  growDurationMs: 8000,
   harvestYield: 1,
+  harvestDrops: {
+    strawCrop: 1,
+  },
 };
 
 export const wheat = {

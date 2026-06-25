@@ -1,4 +1,4 @@
-import { getProductSellPrice } from "./catalog.js";
+import { getProductSellPrice, sortProductsByCoinValue } from "./catalog.js";
 import {
   adjustSellItem,
   getBarnItemQuantity,
@@ -75,7 +75,7 @@ function renderSellEntry(product, quantity) {
 }
 
 function renderSellPanel() {
-  const entries = getSellEntries();
+  const entries = getSellEntries().sort((first, second) => sortProductsByCoinValue(first.product, second.product));
   const total = getSellTotal();
 
   return `

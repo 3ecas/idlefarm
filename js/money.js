@@ -1,37 +1,7 @@
-import { addCoins, getCellDragBounds, hideCell, isCellHidden, moveCell, onStateChange, setMessage, state } from "./state.js";
-import { mountMovableCell } from "./drag.js";
-
-function clampToWorkspace(workspace, left, top) {
-  const bounds = getCellDragBounds("money");
-  const maxLeft = Math.max(0, workspace.clientWidth - bounds.width);
-  const maxTop = Math.max(0, workspace.clientHeight - bounds.height);
-
-  return {
-    left: Math.min(maxLeft, Math.max(0, left)),
-    top: Math.min(maxTop, Math.max(0, top)),
-  };
-}
+import { addCoins, getPinnedMoneyPosition, isCellHidden, onStateChange, state } from "./state.js";
 
 export function mountMoney(container) {
-  mountMovableCell(container, {
-    key: "money",
-    selector: "[data-money-cell]",
-    dragHandle: ".money-header",
-    onDrop: (_dragSnapshot, finalPosition) => {
-      moveCell("money", finalPosition.left, finalPosition.top);
-      return true;
-    },
-  });
-
   container.addEventListener("click", (event) => {
-    const closeButton = event.target.closest("[data-close-cell]");
-    if (closeButton) {
-      event.preventDefault();
-      hideCell("money");
-      setMessage("Money closed.");
-      return;
-    }
-
     const addButton = event.target.closest("[data-add-coins]");
     if (!addButton) {
       return;
@@ -46,11 +16,7 @@ export function mountMoney(container) {
       return;
     }
 
-    const position = clampToWorkspace(
-      container.closest(".workspace"),
-      state.cells.money.left,
-      state.cells.money.top
-    );
+    const position = getPinnedMoneyPosition();
 
     container.innerHTML = `
       <section class="money-cell" data-cell-key="money" data-money-cell style="left:${position.left}px; top:${position.top}px;" aria-label="Money">
@@ -59,7 +25,6 @@ export function mountMoney(container) {
             <span class="money-title__icon" aria-hidden="true">🪙</span>
             <span class="money-title__text">Money</span>
           </span>
-          <button type="button" class="cell-close" data-close-cell aria-label="Close Money">x</button>
         </div>
         <div class="money-body">
           <span class="money-body__value">

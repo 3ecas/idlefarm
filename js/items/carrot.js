@@ -3,7 +3,7 @@ const seed = {
   category: "seeds",
   marketName: "Carrot",
   inventoryName: "Carrot seed",
-  price: 1,
+  price: 2,
   cropProductId: "carrotCrop",
 };
 
@@ -14,8 +14,8 @@ const crop = {
   inventoryName: "Carrot",
   price: 0,
   sellPrice: 2,
-  growDurationMs: 12000,
-  harvestYield: 1,
+  growDurationMs: 66000,
+  harvestYield: 3,
 };
 
 export const carrot = {

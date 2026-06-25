@@ -3,6 +3,7 @@ import { mountAnimalFeeder } from "./animalFeeder.js";
 import { mountBarn } from "./barn.js";
 import { mountBuild } from "./build.js";
 import { mountBakery } from "./bakery.js";
+import { mountChickenCoop } from "./chickenCoop.js";
 import { mountFastItems } from "./fastItems.js";
 import { mountMarket } from "./market.js";
 import { mountMenu } from "./menu.js";
@@ -15,7 +16,7 @@ import { mountFarmCursors } from "./cursor.js";
 import { bootstrapGamePersistence } from "./persistence.js";
 import { getCellSize } from "./layout.js";
 import { clearSelectedInventoryItem } from "./inventory.js";
-import { getStarterLayoutPositions, isCellHidden, moveCell, onStateChange, restartFarm, showCell, state } from "./state.js";
+import { getPinnedMoneyPosition, getStarterLayoutPositions, isCellHidden, moveCell, onStateChange, restartFarm, showCell, state } from "./state.js";
 
 const statusRoot = document.getElementById("status");
 const cellMount = document.getElementById("cell-mount");
@@ -30,6 +31,7 @@ const millMount = document.getElementById("mill-mount");
 const bakeryMount = document.getElementById("bakery-mount");
 const animalFeederMount = document.getElementById("animal-feeder-mount");
 const animalPenMount = document.getElementById("animal-pen-mount");
+const chickenCoopMount = document.getElementById("chicken-coop-mount");
 const menuMount = document.getElementById("menu-mount");
 const restartButton = document.querySelector("[data-restart-farm]");
 
@@ -50,6 +52,7 @@ mountMill(millMount);
 mountBakery(bakeryMount);
 mountAnimalFeeder(animalFeederMount);
 mountAnimalPen(animalPenMount);
+mountChickenCoop(chickenCoopMount);
 mountMenu(menuMount);
 mountFarmCursors();
 onStateChange(renderStatus);
@@ -90,10 +93,16 @@ function refreshLayout() {
     return;
   }
 
+  const moneyPosition = getPinnedMoneyPosition();
+  if (isCellHidden("money")) {
+    showCell("money");
+  }
+  moveCell("money", moneyPosition.left, moneyPosition.top);
+
   if (workspace.clientWidth < 720) {
     const left = 16;
     const gap = 12;
-    let top = 16;
+    let top = 16 + getCellSize("money").height + gap;
 
     if (!isCellHidden("menu")) {
       moveCell("menu", left, top);
@@ -125,6 +134,11 @@ function refreshLayout() {
       top += getCellSize("animalPen").height + gap;
     }
 
+    if (state.buildings.chickenCoop) {
+      moveCell("chickenCoop", left, top);
+      top += getCellSize("chickenCoop").height + gap;
+    }
+
     if (state.buildings.bakery) {
       moveCell("bakery", left, top);
       top += getCellSize("bakery").height + gap;
@@ -133,11 +147,6 @@ function refreshLayout() {
     if (state.buildings.animalFeeder) {
       moveCell("animalFeeder", left, top);
       top += getCellSize("animalFeeder").height + gap;
-    }
-
-    if (!isCellHidden("money")) {
-      moveCell("money", left, top);
-      top += getCellSize("money").height + gap;
     }
 
     if (!isCellHidden("barn")) {
@@ -187,6 +196,11 @@ function refreshLayout() {
     const position = state.cells.animalPen;
     moveCell("animalPen", position.left, position.top);
   }
+
+  if (state.buildings.chickenCoop) {
+    const position = state.cells.chickenCoop;
+    moveCell("chickenCoop", position.left, position.top);
+  }
 }
 
 function ensureCorePanelsVisible() {
@@ -196,7 +210,12 @@ function ensureCorePanelsVisible() {
     showCell("menu");
   }
 
+  if (isCellHidden("money")) {
+    showCell("money");
+  }
+
   moveCell("menu", starterLayout.menu.left, starterLayout.menu.top);
+  moveCell("money", starterLayout.money.left, starterLayout.money.top);
 }
 
 window.addEventListener("resize", refreshLayout);

@@ -5,8 +5,9 @@ const animal = {
   category: "animals",
   marketName: "Cow",
   inventoryName: "Cow",
-  price: 12,
+  price: 55,
   outputProductId: milk.id,
+  penBuildingId: "animalPen",
 };
 
 export const cow = {

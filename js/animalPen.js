@@ -36,14 +36,21 @@ function getRequirementText(product) {
     .join(", ");
 }
 
-function renderAnimalCard(animal) {
+function getAnimalStatusText(animal) {
   const product = getProduct(animal.productId);
   const outputProduct = product?.outputProductId ? getProduct(product.outputProductId) : null;
   const progress = getAnimalProductionProgress(animal);
-  const label = product?.marketName || "Animal";
   const outputLabel = outputProduct?.marketName || "Product";
   const requirementText = getRequirementText(outputProduct);
-  const status = animal.readyAt ? `${outputLabel} ${progress}%` : `Needs ${requirementText || "food"} 0%`;
+
+  return animal.readyAt ? `${outputLabel} ${progress}%` : `Needs ${requirementText || "food"} 0%`;
+}
+
+function renderAnimalCard(animal) {
+  const product = getProduct(animal.productId);
+  const progress = getAnimalProductionProgress(animal);
+  const label = product?.marketName || "Animal";
+  const status = getAnimalStatusText(animal);
 
   return `
     <div class="animal-item" data-animal-id="${animal.id}">
@@ -155,7 +162,7 @@ export function mountAnimalPen(container) {
       const status = item.querySelector(".animal-item__status");
       const progressFill = item.querySelector(".animal-item__progress-fill");
       if (status) {
-        status.textContent = animal.readyAt ? `Milk ${progress}%` : "Needs straw 0%";
+        status.textContent = getAnimalStatusText(animal);
       }
       if (progressFill) {
         progressFill.style.width = `${progress}%`;

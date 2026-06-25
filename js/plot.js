@@ -13,7 +13,7 @@ import {
   state,
   waterPlot,
 } from "./state.js";
-import { getProduct } from "./catalog.js";
+import { getProduct, sortProductsByCoinValue } from "./catalog.js";
 import { CROP_ITEMS } from "./seeds.js";
 import { mountMovableCell, wasRecentlyDragged } from "./drag.js";
 
@@ -52,7 +52,8 @@ function getAvailableSeedEntries() {
       const quantity = getBarnItemQuantity(seed.id);
       return quantity > 0 ? { seed, quantity } : null;
     })
-    .filter(Boolean);
+    .filter(Boolean)
+    .sort((first, second) => sortProductsByCoinValue(first.seed, second.seed));
 }
 
 function getSeedPickerPosition(workspace, plot) {
