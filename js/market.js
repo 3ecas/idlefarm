@@ -167,7 +167,7 @@ export function mountMarket(container) {
               type="button"
               class="shopping-toggle"
               data-shopping-toggle
-              aria-label="${isShoppingListOpen() ? "Hide shopping cart" : "Show shopping cart"}"
+              aria-label="${isShoppingListOpen() ? "Hide basket" : "Show basket"}"
               aria-expanded="${isShoppingListOpen() ? "true" : "false"}"
             >
               ${isShoppingListOpen() ? "-" : "+"}

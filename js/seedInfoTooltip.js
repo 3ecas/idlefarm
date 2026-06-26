@@ -198,7 +198,7 @@ export function attachSeedInfoTooltip(container, { isEnabled = () => true } = {}
   }
 
   function move(event) {
-    if (!hoveredSeedId) {
+    if (!hoveredProductId) {
       return;
     }
 

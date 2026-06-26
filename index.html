@@ -5,27 +5,51 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Idle Farm</title>
     <link rel="stylesheet" href="styles.css" />
-    <script type="module" src="js/main.js"></script>
+    <script type="module" src="js/farmPage.js"></script>
   </head>
   <body>
-      <main class="scene">
+    <main class="scene farm-page">
       <div class="grid-overlay"></div>
       <section id="workspace" class="workspace">
         <div id="cell-mount" class="cell-mount"></div>
-        <div id="market-mount" class="cell-mount"></div>
         <div id="sell-market-mount" class="cell-mount"></div>
-        <div id="money-mount" class="cell-mount"></div>
-        <div id="shopping-mount" class="cell-mount"></div>
-        <div id="barn-mount" class="cell-mount"></div>
-        <div id="fast-items-mount" class="cell-mount"></div>
-        <div id="build-mount" class="cell-mount"></div>
-        <div id="mill-mount" class="cell-mount"></div>
-        <div id="bakery-mount" class="cell-mount"></div>
-        <div id="animal-feeder-mount" class="cell-mount"></div>
-        <div id="animal-pen-mount" class="cell-mount"></div>
-        <div id="chicken-coop-mount" class="cell-mount"></div>
-        <div id="menu-mount" class="cell-mount"></div>
       </section>
+      <section class="top-info-panel" data-top-info-panel aria-label="Info panel">
+        <div class="day-night-cell" data-day-night-cell>
+          <span class="day-night-icon" aria-hidden="true">☀</span>
+          <span class="day-night-track" aria-hidden="true">
+            <span class="day-night-fill" data-day-night-fill></span>
+          </span>
+          <span class="day-night-icon" aria-hidden="true">☾</span>
+        </div>
+        <div class="top-money-cell" data-top-money-cell>
+          <span class="money-coin" aria-hidden="true"></span>
+          <span class="money-value" data-top-money-value>0</span>
+          <button type="button" class="top-money-add" data-add-coins aria-label="Add 100 coins">+</button>
+        </div>
+      </section>
+      <nav class="side-tabs" data-side-tabs aria-label="Main menu">
+        <button type="button" class="side-tab" data-side-tab="barn">
+          <span class="side-tab__icon" aria-hidden="true">📦</span>
+          <span>Barn</span>
+        </button>
+        <button type="button" class="side-tab" data-side-tab="shop">
+          <span class="side-tab__icon" aria-hidden="true">🛒</span>
+          <span>Shop</span>
+        </button>
+        <button type="button" class="side-tab" data-side-tab="build">
+          <span class="side-tab__icon" aria-hidden="true">🔨</span>
+          <span>Build</span>
+        </button>
+      </nav>
+      <aside class="side-panel-shell" data-side-panel aria-hidden="true">
+        <section class="side-panel-window">
+          <header class="side-panel-header">
+            <h1 data-side-panel-title></h1>
+          </header>
+          <div class="page-content side-panel-content" data-side-panel-content></div>
+        </section>
+      </aside>
       <div class="farm-controls">
         <button type="button" class="restart-farm" data-restart-farm>Restart farm</button>
         <div class="delete-zone" data-delete-zone>Delete</div>

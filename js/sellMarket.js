@@ -4,13 +4,11 @@ import {
   getBarnItemQuantity,
   getSellEntries,
   getSellTotal,
-  hideCell,
   isCellHidden,
   moveCell,
   onStateChange,
   removeSellItem,
   sellQueuedItems,
-  setMessage,
   state,
 } from "./state.js";
 import { mountMovableCell } from "./drag.js";
@@ -106,14 +104,6 @@ export function mountSellMarket(container) {
   });
 
   container.addEventListener("click", (event) => {
-    const closeButton = event.target.closest("[data-close-cell]");
-    if (closeButton) {
-      event.preventDefault();
-      hideCell("sellMarket");
-      setMessage("Market closed.");
-      return;
-    }
-
     const adjustButton = event.target.closest("[data-sell-adjust]");
     if (adjustButton) {
       event.preventDefault();
@@ -155,9 +145,6 @@ export function mountSellMarket(container) {
             <span class="market-title__icon" aria-hidden="true">⚖</span>
             <span class="market-title__text">Market</span>
           </span>
-          <div class="cell-header-actions">
-            <button type="button" class="cell-close" data-close-cell aria-label="Close Market">x</button>
-          </div>
         </div>
         <div class="market-body">
           ${renderSellPanel()}

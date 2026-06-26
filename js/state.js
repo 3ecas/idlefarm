@@ -13,7 +13,7 @@ const FARM_PLOT_SPAWN_GAP = 0;
 const FARM_PLOT_BASE_COST = 10;
 const FARM_PLOT_PRICE_GROWTH = 1.75;
 const FARM_PLOT_STORAGE_KEY = "idle-farm-farm-plots-v2";
-const FARM_PLOT_SAVE_VERSION = "4";
+const FARM_PLOT_SAVE_VERSION = "5";
 const FARM_STAGE_EMPTY = "empty";
 const FARM_STAGE_PLANTED = "planted";
 const FARM_STAGE_GROWING = "growing";
@@ -221,14 +221,19 @@ function saveStringArray(key, values) {
   }
 }
 
-function readFarmPlots() {
-  const storedVersion = localStorage.getItem(STORAGE_KEYS.farmPlotSaveVersion);
-  if (storedVersion !== FARM_PLOT_SAVE_VERSION) {
-    const plots = [];
-    saveFarmPlots(plots);
-    return plots;
-  }
+function createStarterFarmPlots() {
+  const position = createFarmPlotRecord("farm-plot-0", DEFAULT_CELL_POSITIONS.farm, []);
+  return [{
+    id: "farm-plot-0",
+    left: position.left,
+    top: position.top,
+    cropId: null,
+    stage: FARM_STAGE_EMPTY,
+    growCompleteAt: null,
+  }];
+}
 
+function readStoredFarmPlots() {
   try {
     const parsed = JSON.parse(localStorage.getItem(FARM_PLOT_STORAGE_KEY) || "null");
     if (Array.isArray(parsed) && parsed.length > 0) {
@@ -243,12 +248,16 @@ function readFarmPlots() {
       return plots;
     }
   } catch {
-    // Fall back to legacy storage.
+    // Fall back to a starter plot.
   }
 
-  const plots = [];
+  const plots = createStarterFarmPlots();
   saveFarmPlots(plots);
   return plots;
+}
+
+function readFarmPlots() {
+  return readStoredFarmPlots();
 }
 
 function saveFarmPlots(plots) {
@@ -2413,7 +2422,7 @@ export function restartFarm() {
   saveCellPosition("animalPen", state.cells.animalPen);
   saveCellPosition("chickenCoop", state.cells.chickenCoop);
   saveCellPosition("tools", state.cells.tools);
-  state.farm.plots = [];
+  state.farm.plots = createStarterFarmPlots();
   state.farm.enteringPlotIds = [];
   for (const timerId of growthTimers.values()) {
     window.clearTimeout(timerId);

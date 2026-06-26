@@ -69,12 +69,12 @@ export function isShoppingListOpen() {
 export function toggleShoppingList() {
   if (isCellHidden("shopping")) {
     showCell("shopping");
-    setMessage("Shopping opened.");
+    setMessage("Basket opened.");
     return;
   }
 
   hideCell("shopping");
-  setMessage("Shopping closed.");
+  setMessage("Basket closed.");
 }
 
 export function mountShopping(container) {
@@ -101,7 +101,7 @@ export function mountShopping(container) {
     if (closeButton) {
       event.preventDefault();
       hideCell("shopping");
-      setMessage("Shopping closed.");
+      setMessage("Basket closed.");
     }
   });
 
@@ -118,10 +118,10 @@ export function mountShopping(container) {
     const hasEntries = entries.length > 0;
 
     container.innerHTML = `
-      <section class="shopping-cell" data-cell-key="shopping" data-shopping-cell style="left:${position.left}px; top:${position.top}px;" aria-label="Shopping list">
+      <section class="shopping-cell" data-cell-key="shopping" data-shopping-cell style="left:${position.left}px; top:${position.top}px;" aria-label="Basket">
         <div class="shopping-header">
-          <span class="shopping-title">Shopping list</span>
-          <button type="button" class="cell-close" data-close-cell aria-label="Close Shopping list">x</button>
+          <span class="shopping-title">Basket</span>
+          <button type="button" class="cell-close" data-close-cell aria-label="Close basket">x</button>
         </div>
         <div class="shopping-body">
           ${

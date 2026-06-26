@@ -29,6 +29,7 @@ body {
   color: var(--foreground);
   background: #fff;
   font: 13px/1.35 "Trebuchet MS", "Segoe UI", ui-rounded, system-ui, sans-serif;
+  transition: background-color 0.4s ease, color 0.4s ease;
 }
 
 button {
@@ -57,6 +58,9 @@ body.is-dragging-cell {
   width: 100vw;
   height: 100vh;
   overflow: hidden;
+  padding-bottom: 76px;
+  background: #fff;
+  transition: background-color 0.4s ease;
 }
 
 .grid-overlay {
@@ -68,12 +72,720 @@ body.is-dragging-cell {
   background-size: 24px 24px;
   opacity: 1;
   pointer-events: none;
+  transition: opacity 0.4s ease, filter 0.4s ease;
 }
 
 .workspace {
   position: relative;
   width: 100%;
   height: 100%;
+}
+
+.farm-page .workspace {
+  height: 100%;
+}
+
+.farm-page {
+  padding-bottom: 0;
+}
+
+body.is-night {
+  --foreground: #fff;
+  --muted: #fff;
+  --surface: rgba(14, 18, 31, 0.96);
+  --border: rgba(255, 255, 255, 0.58);
+  color: #fff;
+  background: #101522;
+}
+
+body.is-night .scene {
+  background: #101522;
+}
+
+body.is-night .workspace {
+  filter: none;
+}
+
+body.is-night .grid-overlay {
+  filter: brightness(0.72);
+  opacity: 0.42;
+}
+
+.top-info-panel {
+  position: fixed;
+  z-index: 3300;
+  left: 14px;
+  top: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: auto;
+}
+
+.day-night-cell,
+.top-money-cell {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  border: 1px solid rgba(127, 196, 127, 0.22);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 6px 18px rgba(67, 94, 67, 0.08);
+}
+
+.day-night-cell {
+  gap: 7px;
+  width: 160px;
+  padding: 7px 9px;
+}
+
+.day-night-icon {
+  flex: 0 0 auto;
+  width: 16px;
+  color: #d5a029;
+  font-size: 0.9rem;
+  line-height: 1;
+  text-align: center;
+}
+
+.day-night-icon:last-child {
+  color: #6f82bd;
+}
+
+.day-night-track {
+  position: relative;
+  flex: 1 1 auto;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #dbe6f5;
+}
+
+.day-night-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #ffd977, #8aa0df);
+  transition: width 0.6s linear;
+}
+
+.day-night-cell.is-night .day-night-fill {
+  background: linear-gradient(90deg, #6f82bd, #2f3959);
+}
+
+.top-money-cell {
+  gap: 6px;
+  min-width: 72px;
+  padding: 7px 10px;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.top-money-add {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid rgba(127, 196, 127, 0.22);
+  border-radius: 999px;
+  background: #f3f9ef;
+  color: var(--foreground);
+  cursor: pointer;
+  font-size: 0.76rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.top-money-add:hover,
+.top-money-add:focus-visible {
+  border-color: rgba(127, 196, 127, 0.42);
+  background: #eaf6e0;
+}
+
+body.is-night .day-night-cell,
+body.is-night .top-money-cell,
+body.is-night .side-tab,
+body.is-night .side-panel-window,
+body.is-night .page-section,
+body.is-night .page-item,
+body.is-night .page-list-row {
+  border-color: rgba(255, 255, 255, 0.58);
+  background: rgba(14, 18, 31, 0.96);
+}
+
+body.is-night .side-tab.is-active,
+body.is-night .page-item--button:hover,
+body.is-night .page-item--button:focus-visible,
+body.is-night .page-item--buyable:hover,
+body.is-night .page-item--buyable:focus-visible {
+  background: #253454;
+}
+
+body.is-night .top-info-panel,
+body.is-night .side-tabs,
+body.is-night .side-panel-window,
+body.is-night .page-section,
+body.is-night .page-item,
+body.is-night .page-list-row,
+body.is-night .status,
+body.is-night .market-cell,
+body.is-night .sell-market-cell {
+  color: #fff;
+}
+
+.side-tabs {
+  position: fixed;
+  z-index: 3200;
+  left: 10px;
+  top: 50%;
+  display: grid;
+  gap: 7px;
+  transform: translateY(-50%);
+}
+
+.side-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 5px;
+  width: 78px;
+  min-height: 36px;
+  padding: 6px 7px;
+  border: 1px solid rgba(127, 196, 127, 0.22);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 6px 18px rgba(67, 94, 67, 0.08);
+  color: var(--foreground);
+  cursor: pointer;
+  font-size: 0.62rem;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.side-tab.is-active {
+  border-color: rgba(127, 196, 127, 0.48);
+  background: #eaf6e0;
+}
+
+.side-tab__icon {
+  flex: 0 0 auto;
+  width: 16px;
+  line-height: 1;
+  text-align: center;
+}
+
+.side-panel-shell {
+  position: fixed;
+  z-index: 3100;
+  left: 96px;
+  top: 50%;
+  width: min(430px, calc(100vw - 116px));
+  max-height: calc(100vh - 30px);
+  pointer-events: none;
+  transform: translate(calc(-100% - 112px), -50%);
+  opacity: 0;
+  transition: transform 180ms ease, opacity 180ms ease;
+}
+
+.side-panel-shell[data-active-panel="build"] {
+  width: min(350px, calc(100vw - 116px));
+}
+
+.side-panel-shell.is-open {
+  pointer-events: auto;
+  transform: translate(0, -50%);
+  opacity: 1;
+}
+
+.side-panel-window {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  max-height: calc(100vh - 30px);
+  overflow: hidden;
+  border: 1px solid rgba(127, 196, 127, 0.22);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 18px 38px rgba(67, 94, 67, 0.18);
+}
+
+.side-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 12px 8px;
+  border-bottom: 1px solid rgba(127, 196, 127, 0.16);
+}
+
+.side-panel-header h1 {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.basket-toggle {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid rgba(127, 196, 127, 0.22);
+  border-radius: 8px;
+  background: #f3f9ef;
+  cursor: pointer;
+  font-size: 0.88rem;
+  line-height: 1;
+}
+
+.basket-toggle[hidden] {
+  display: none;
+}
+
+.basket-toggle:hover,
+.basket-toggle:focus-visible,
+.basket-toggle.is-active {
+  border-color: rgba(127, 196, 127, 0.42);
+  background: #eaf6e0;
+}
+
+.side-panel-content {
+  position: relative;
+  gap: 10px;
+  min-height: 0;
+  padding: 10px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.shop-panel-layout {
+  position: relative;
+}
+
+.shop-panel-main {
+  display: grid;
+  gap: 10px;
+}
+
+.shop-shopping-list {
+  box-shadow: 0 12px 24px rgba(67, 94, 67, 0.12);
+}
+
+.basket-cell {
+  position: fixed;
+  z-index: 3350;
+  display: grid;
+  gap: 8px;
+  width: min(250px, calc(100vw - 24px));
+  max-height: min(320px, calc(100vh - 24px));
+  padding: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(127, 196, 127, 0.22);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 18px 38px rgba(67, 94, 67, 0.18);
+}
+
+.basket-cell[hidden] {
+  display: none;
+}
+
+.basket-cell.is-dragging {
+  cursor: grabbing;
+}
+
+.basket-cell__header {
+  display: flex;
+  align-items: center;
+  min-height: 24px;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.basket-cell__title {
+  font-size: 0.82rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.basket-cell__content {
+  display: grid;
+  gap: 8px;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+body.is-night .money-value {
+  color: #fff;
+}
+
+.barn-panel-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+
+.barn-sort-button {
+  min-width: 96px;
+}
+
+.panel-item-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.panel-item-tile {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  min-width: 0;
+  min-height: 0;
+  padding: 8px 4px 13px;
+  overflow: hidden;
+  border: 1px solid rgba(127, 196, 127, 0.2);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--foreground);
+  text-align: center;
+}
+
+.panel-item-tile--button {
+  cursor: pointer;
+}
+
+.panel-item-tile--button:hover,
+.panel-item-tile--button:focus-visible {
+  border-color: rgba(127, 196, 127, 0.42);
+  background: #f5fbf1;
+}
+
+.panel-item-tile__bar {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 5px;
+  background: var(--item-color, #d8dde6);
+}
+
+.panel-item-tile__name {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 0.58rem;
+  font-weight: 800;
+  line-height: 1.05;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.panel-item-tile__value {
+  position: absolute;
+  right: 5px;
+  bottom: 3px;
+  color: var(--muted);
+  font-size: 0.5rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.item-category-seeds {
+  --item-color: #7fcf7f;
+}
+
+.item-category-crops {
+  --item-color: #d9b35f;
+}
+
+.item-category-materials {
+  --item-color: #9aa4b2;
+}
+
+.item-category-processed {
+  --item-color: #c786d8;
+}
+
+.item-category-animals {
+  --item-color: #f09b72;
+}
+
+.item-category-farm,
+.item-category-other {
+  --item-color: #8fb9e8;
+}
+
+body.is-night .panel-item-tile {
+  border-color: rgba(255, 255, 255, 0.58);
+  background: rgba(14, 18, 31, 0.96);
+  color: #fff;
+}
+
+body.is-night .panel-item-tile--button:hover,
+body.is-night .panel-item-tile--button:focus-visible {
+  background: #253454;
+}
+
+.page-content {
+  display: grid;
+  gap: 12px;
+}
+
+.page-section {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid rgba(127, 196, 127, 0.18);
+  border-radius: 10px;
+  background: #fafdf8;
+}
+
+.page-section--accent {
+  background: #f7fbf4;
+}
+
+.page-section h2 {
+  margin: 0;
+  font-size: 0.86rem;
+  line-height: 1;
+}
+
+.page-section--collapsible {
+  padding: 0;
+  overflow: hidden;
+}
+
+.page-section__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 34px;
+  padding: 9px 10px;
+  cursor: pointer;
+  list-style: none;
+  font-size: 0.82rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.page-section__summary::-webkit-details-marker {
+  display: none;
+}
+
+.page-section__summary::after {
+  content: ">";
+  color: var(--muted);
+  font-size: 0.76rem;
+  transition: transform 0.15s ease;
+}
+
+.page-section--collapsible[open] > .page-section__summary::after {
+  transform: rotate(90deg);
+}
+
+.page-section__body {
+  display: grid;
+  gap: 8px;
+  padding: 0 10px 10px;
+}
+
+.page-item-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.page-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 8px;
+  border: 1px solid rgba(127, 196, 127, 0.18);
+  border-radius: 9px;
+  background: #fff;
+}
+
+.page-item--button {
+  width: 100%;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.page-item--button:hover,
+.page-item--button:focus-visible {
+  border-color: rgba(127, 196, 127, 0.42);
+  background: #f5fbf1;
+}
+
+.page-item--buyable {
+  cursor: pointer;
+}
+
+.page-item--buyable:hover,
+.page-item--buyable:focus-visible {
+  border-color: rgba(127, 196, 127, 0.42);
+  background: #f5fbf1;
+}
+
+.page-item--button:active {
+  transform: translateY(1px);
+}
+
+.page-item--actions {
+  grid-template-columns: minmax(0, 1fr);
+  align-content: space-between;
+}
+
+.page-item--actions .page-item__side {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+
+.page-item--actions .page-action {
+  flex: 1 1 42px;
+  min-width: 0;
+}
+
+.page-item__main {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.page-item__name,
+.page-item__meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.page-item__name {
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.page-item__meta {
+  color: var(--muted);
+  font-size: 0.58rem;
+  line-height: 1;
+}
+
+.page-item__side {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.page-item__price {
+  color: var(--muted);
+  font-size: 0.62rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.page-action,
+.page-primary-action {
+  border: 1px solid rgba(127, 196, 127, 0.22);
+  border-radius: 8px;
+  background: #f3f9ef;
+  cursor: pointer;
+  font-size: 0.62rem;
+  font-weight: 800;
+}
+
+.page-action {
+  min-height: 24px;
+  padding: 3px 8px;
+}
+
+.page-action--small {
+  min-width: 24px;
+  padding: 3px 6px;
+}
+
+.page-primary-action {
+  width: 100%;
+  min-height: 34px;
+}
+
+.page-action:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.build-option-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.build-option-cell {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  min-height: 52px;
+  text-align: left;
+}
+
+.build-option-cell .page-item__main {
+  gap: 5px;
+}
+
+.build-option-cell .page-item__name,
+.build-option-cell .page-item__meta {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+}
+
+.build-option-cell .page-item__meta {
+  font-size: 0.64rem;
+  line-height: 1.25;
+}
+
+.build-option-status {
+  align-self: start;
+  color: var(--muted);
+  font-size: 0.58rem;
+  font-weight: 800;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.page-list {
+  display: grid;
+  gap: 6px;
+}
+
+.page-list-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto auto;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 8px;
+  border: 1px solid rgba(127, 196, 127, 0.18);
+  border-radius: 9px;
+  background: #fff;
+}
+
+.page-list-row span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.page-empty {
+  display: grid;
+  place-items: center;
+  min-height: 38px;
+  border: 1px solid rgba(127, 196, 127, 0.28);
+  border-radius: 9px;
+  color: var(--muted);
+  font-size: 0.66rem;
+  font-weight: 800;
 }
 
 .cell-mount {
@@ -322,7 +1034,7 @@ body.is-dragging-cell {
   width: 128px;
   min-height: 72px;
   padding: 8px;
-  border: 1.5px dashed rgba(127, 196, 127, 0.65);
+  border: 1px solid rgba(127, 196, 127, 0.32);
   border-radius: 18px;
   background: #fff;
   box-shadow: none;
@@ -348,7 +1060,7 @@ body.is-dragging-cell {
   gap: 6px;
   min-height: 72px;
   padding: 8px;
-  border: 1.5px dashed rgba(127, 196, 127, 0.6);
+  border: 1px solid rgba(127, 196, 127, 0.28);
   border-radius: 18px;
   background: #fff;
   box-shadow: none;
@@ -724,7 +1436,7 @@ body.is-dragging-cell {
 
 .seed-info-tooltip {
   position: fixed;
-  z-index: 1000;
+  z-index: 5000;
   width: 172px;
   padding: 8px;
   border: 1px solid rgba(127, 196, 127, 0.28);
@@ -781,7 +1493,7 @@ body.is-dragging-cell {
   width: 320px;
   min-height: 0;
   padding: 8px;
-  border: 1.5px dashed rgba(127, 196, 127, 0.6);
+  border: 1px solid rgba(127, 196, 127, 0.28);
   border-radius: 18px;
   background: #fff;
   box-shadow: none;
@@ -793,6 +1505,14 @@ body.is-dragging-cell {
 .build-cell,
 .mill-cell {
   width: 192px;
+}
+
+.mill-cell,
+.bakery-cell,
+.animal-feeder-cell,
+.animal-pen-cell {
+  border-style: dashed;
+  border-width: 1.5px;
 }
 
 .mill-cell {
@@ -975,7 +1695,7 @@ body.is-dragging-cell {
   display: grid;
   place-items: center;
   min-height: 34px;
-  border: 1px dashed rgba(127, 196, 127, 0.28);
+  border: 1px solid rgba(127, 196, 127, 0.28);
   border-radius: 10px;
   color: var(--muted);
   font-size: 0.56rem;
@@ -1222,7 +1942,7 @@ button.inventory-tile.is-dragging {
   display: grid;
   gap: 2px;
   padding: 6px 8px;
-  border: 1px dashed rgba(127, 196, 127, 0.28);
+  border: 1px solid rgba(127, 196, 127, 0.28);
   border-radius: 12px;
   background: #f7fbf4;
 }
@@ -1293,7 +2013,7 @@ button.inventory-tile.is-dragging {
 
 .animal-pen-empty {
   padding: 6px 8px;
-  border: 1px dashed rgba(127, 196, 127, 0.22);
+  border: 1px solid rgba(127, 196, 127, 0.22);
   border-radius: 12px;
   color: var(--muted);
   font-size: 0.68rem;
@@ -1302,7 +2022,7 @@ button.inventory-tile.is-dragging {
 
 .sell-empty {
   padding: 7px;
-  border: 1px dashed rgba(127, 196, 127, 0.26);
+  border: 1px solid rgba(127, 196, 127, 0.26);
   border-radius: 10px;
   color: var(--muted);
   font-size: 0.7rem;
@@ -1611,7 +2331,7 @@ button.inventory-item.is-dragging:not(.inventory-item--ghost) {
   min-height: 34px;
   padding: 8px 10px;
   border-radius: 14px;
-  border: 1.5px dashed rgba(127, 196, 127, 0.4);
+  border: 1px solid rgba(127, 196, 127, 0.4);
   background: rgba(255, 255, 255, 0.94);
   color: var(--foreground);
   font-size: 0.78rem;
@@ -1641,4 +2361,203 @@ button.inventory-item.is-dragging:not(.inventory-item--ghost) {
   border-color: rgba(209, 92, 92, 0.95);
   background: #ffe1e1;
   color: #7f2f2f;
+}
+
+body.is-night,
+body.is-night button,
+body.is-night input,
+body.is-night summary {
+  color: #fff;
+}
+
+body.is-night .day-night-cell,
+body.is-night .top-money-cell,
+body.is-night .top-money-add,
+body.is-night .side-tab,
+body.is-night .side-panel-window,
+body.is-night .basket-toggle,
+body.is-night .basket-cell,
+body.is-night .money-cell,
+body.is-night .money-body,
+body.is-night .money-add,
+body.is-night .menu-cell,
+body.is-night .tools-cell,
+body.is-night .menu-button,
+body.is-night .tool-button,
+body.is-night .market-toggle,
+body.is-night .cell-close,
+body.is-night .shopping-toggle,
+body.is-night .page-section,
+body.is-night .page-section--accent,
+body.is-night .page-item,
+body.is-night .page-list-row,
+body.is-night .page-action,
+body.is-night .page-primary-action,
+body.is-night .panel-item-tile,
+body.is-night .farm-cell,
+body.is-night .seed-picker,
+body.is-night .seed-picker__item,
+body.is-night .seed-info-tooltip,
+body.is-night .market-cell,
+body.is-night .sell-market-cell,
+body.is-night .market-product,
+body.is-night .build-cell,
+body.is-night .mill-cell,
+body.is-night .bakery-cell,
+body.is-night .animal-feeder-cell,
+body.is-night .animal-pen-cell,
+body.is-night .shopping-cell,
+body.is-night .barn-cell,
+body.is-night .fast-items-cell,
+body.is-night .build-product,
+body.is-night .mill-action,
+body.is-night .animal-feeder-slot,
+body.is-night .animal-item,
+body.is-night .sell-item,
+body.is-night .sell-empty,
+body.is-night .sell-action,
+body.is-night .sell-quantity__button,
+body.is-night .sell-item__remove,
+body.is-night .shopping-item,
+body.is-night .shopping-empty,
+body.is-night .shopping-purchase,
+body.is-night .shopping-item__remove,
+body.is-night .inventory-item,
+body.is-night .barn-section,
+body.is-night .status,
+body.is-night .restart-farm,
+body.is-night .delete-zone {
+  border-color: rgba(255, 255, 255, 0.58);
+  background: rgba(14, 18, 31, 0.96);
+  color: #fff;
+}
+
+body.is-night .farm-cell--empty,
+body.is-night .farm-cell--planted,
+body.is-night .farm-cell--growing,
+body.is-night .farm-cell--mature {
+  background: rgba(14, 18, 31, 0.96);
+}
+
+body.is-night .top-info-panel *,
+body.is-night .side-tabs *,
+body.is-night .side-panel-window *,
+body.is-night .basket-cell *,
+body.is-night .money-cell *,
+body.is-night .menu-cell *,
+body.is-night .tools-cell *,
+body.is-night .page-section *,
+body.is-night .page-item *,
+body.is-night .page-list-row *,
+body.is-night .panel-item-tile *,
+body.is-night .farm-cell *,
+body.is-night .seed-picker *,
+body.is-night .seed-info-tooltip *,
+body.is-night .market-cell *,
+body.is-night .sell-market-cell *,
+body.is-night .build-cell *,
+body.is-night .mill-cell *,
+body.is-night .bakery-cell *,
+body.is-night .animal-feeder-cell *,
+body.is-night .animal-pen-cell *,
+body.is-night .shopping-cell *,
+body.is-night .barn-cell *,
+body.is-night .fast-items-cell *,
+body.is-night .inventory-item *,
+body.is-night .barn-section *,
+body.is-night .status *,
+body.is-night .restart-farm *,
+body.is-night .delete-zone * {
+  color: #fff;
+}
+
+body.is-night .page-item__meta,
+body.is-night .page-item__price,
+body.is-night .panel-item-tile__value,
+body.is-night .page-section__summary::after,
+body.is-night .seed-picker__meta,
+body.is-night .seed-picker__empty,
+body.is-night .seed-info-tooltip__row span,
+body.is-night .market-product__price,
+body.is-night .build-product__cost,
+body.is-night .mill-action__ingredients,
+body.is-night .animal-feeder-slot__status,
+body.is-night .animal-pen-food__label,
+body.is-night .animal-item__status,
+body.is-night .animal-pen-empty,
+body.is-night .sell-item__price,
+body.is-night .sell-quantity__value,
+body.is-night .sell-empty,
+body.is-night .shopping-empty,
+body.is-night .inventory-item--empty,
+body.is-night .inventory-item__count {
+  color: #fff;
+}
+
+body.is-night .side-tab.is-active,
+body.is-night .top-money-add:hover,
+body.is-night .top-money-add:focus-visible,
+body.is-night .basket-toggle:hover,
+body.is-night .basket-toggle:focus-visible,
+body.is-night .basket-toggle.is-active,
+body.is-night .money-add:hover,
+body.is-night .money-add:focus-visible,
+body.is-night .market-toggle:hover,
+body.is-night .market-toggle:focus-visible,
+body.is-night .cell-close:hover,
+body.is-night .cell-close:focus-visible,
+body.is-night .shopping-toggle:hover,
+body.is-night .shopping-toggle:focus-visible,
+body.is-night .menu-button:hover,
+body.is-night .menu-button:focus-visible,
+body.is-night .menu-button.is-selected,
+body.is-night .tool-button:hover,
+body.is-night .tool-button:focus-visible,
+body.is-night .tool-button.is-selected,
+body.is-night .page-action:hover,
+body.is-night .page-action:focus-visible,
+body.is-night .page-item--button:hover,
+body.is-night .page-item--button:focus-visible,
+body.is-night .page-item--buyable:hover,
+body.is-night .page-item--buyable:focus-visible,
+body.is-night .panel-item-tile--button:hover,
+body.is-night .panel-item-tile--button:focus-visible,
+body.is-night .seed-picker__item:hover,
+body.is-night .seed-picker__item:focus-visible,
+body.is-night .market-product:hover,
+body.is-night .market-product:focus-visible,
+body.is-night .build-product:hover,
+body.is-night .build-product:focus-visible,
+body.is-night .mill-action:hover,
+body.is-night .mill-action:focus-visible,
+body.is-night .animal-feeder-slot:hover,
+body.is-night .animal-feeder-slot:focus-visible,
+body.is-night .sell-action:hover,
+body.is-night .sell-action:focus-visible,
+body.is-night .sell-quantity__button:hover,
+body.is-night .sell-quantity__button:focus-visible,
+body.is-night .sell-item__remove:hover,
+body.is-night .sell-item__remove:focus-visible,
+body.is-night button.inventory-item:hover,
+body.is-night button.inventory-item:focus-visible,
+body.is-night button.inventory-item.is-selected,
+body.is-night .shopping-purchase:hover,
+body.is-night .shopping-purchase:focus-visible,
+body.is-night .shopping-item__remove:hover,
+body.is-night .shopping-item__remove:focus-visible,
+body.is-night .restart-farm:hover,
+body.is-night .restart-farm:focus-visible,
+body.is-night .delete-zone.is-active {
+  border-color: rgba(255, 255, 255, 0.78);
+  background: #253454;
+  color: #fff;
+}
+
+body.is-night .farm-cell__progress,
+body.is-night .day-night-track {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+body.is-night .farm-cell__progress-fill {
+  background: #fff;
 }
