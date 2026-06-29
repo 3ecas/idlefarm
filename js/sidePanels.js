@@ -32,10 +32,10 @@ import {
   millWheatToFlour,
   onStateChange,
   purchaseShoppingList,
-  removeAllShoppingItem,
   removeShoppingItem,
   removeSellItem,
   sellQueuedItems,
+  setShoppingItemQuantity,
   state,
 } from "./state.js";
 import { getInventoryEntries } from "./inventory.js";
@@ -53,7 +53,6 @@ const DASHBOARD_SECTIONS = [
   { key: "market", label: "Market", icon: "⚖" },
   { key: "build", label: "Build", icon: "🔨" },
 ];
-const DASHBOARD_BASKET_SECTION = { key: "basket", label: "Basket", icon: "🧺" };
 const BUILD_ICONS = {
   bakery: "🍞",
   mill: "⚙",
@@ -91,12 +90,14 @@ let activeDashboardSection = "overview";
 let activeDashboardBarnSection = null;
 let activeDashboardShopSection = null;
 let activeDashboardBuildSection = null;
+let isDashboardBasketOpen = false;
 let switchTimer = null;
 let barnSortIndex = 0;
 let barnItemDrag = null;
 let sidePanelTooltip = null;
 let dashboardRender = null;
 let dashboardContentRoot = null;
+let barnItemContextMenu = null;
 const collapsedSections = new Set();
 
 function getCategoryOrder(product) {
@@ -473,7 +474,16 @@ function renderShoppingList() {
               </span>
               <span class="shopping-item__controls" aria-label="${product.marketName} basket controls">
                 <button type="button" class="page-action page-action--small shopping-item__control" data-shop-remove="${product.id}" aria-label="Remove one ${product.marketName}">-</button>
-                <button type="button" class="page-action page-action--small shopping-item__control shopping-item__control--all" data-shop-remove-all="${product.id}" aria-label="Remove all ${product.marketName}">all</button>
+                <input
+                  class="shopping-item__quantity-input"
+                  type="number"
+                  min="0"
+                  step="1"
+                  inputmode="numeric"
+                  value="${quantity}"
+                  data-shop-quantity="${product.id}"
+                  aria-label="${product.marketName} quantity"
+                >
                 <button type="button" class="page-action page-action--small shopping-item__control" data-shop-add="${product.id}" aria-label="Add one ${product.marketName}">+</button>
               </span>
             </div>
@@ -776,7 +786,6 @@ function renderDashboardOverview() {
   const cards = [
     { key: "barn", label: "Barn", icon: "📦", meta: `${inventoryCount} items`, detail: "Inventory and drops" },
     { key: "shop", label: "Shop", icon: "🛒", meta: `${shoppingCount} in basket`, detail: "Buy items and seeds" },
-    { key: "basket", label: "Basket", icon: "🧺", meta: `${shoppingCount} items`, detail: "Review and purchase" },
     { key: "market", label: "Market", icon: "⚖", meta: `${sellCount} queued`, detail: "Sell crops and products" },
     { key: "build", label: "Build", icon: "🔨", meta: `${builtCount} built`, detail: "Construct and expand" },
   ];
@@ -814,10 +823,6 @@ function renderDashboardSection(sectionKey) {
     return renderShopPanel();
   }
 
-  if (sectionKey === "basket") {
-    return renderBasketPanel();
-  }
-
   if (sectionKey === "market") {
     return renderMarketPanel();
   }
@@ -831,6 +836,60 @@ function renderDashboardSection(sectionKey) {
 
 function renderDashboardCategorySubmenu(sectionKey) {
   return "";
+}
+
+function renderDashboardBasketDrawer() {
+  return `
+    <div class="dashboard-basket-drawer ${isDashboardBasketOpen ? "is-open" : ""}" ${isDashboardBasketOpen ? "" : "hidden"}>
+      ${renderBasketPanel()}
+    </div>
+  `;
+}
+
+function renderBarnItemContextMenu() {
+  if (!barnItemContextMenu) {
+    return "";
+  }
+
+  const product = getProduct(barnItemContextMenu.productId);
+  if (!product) {
+    return "";
+  }
+
+  const animalTargetLabel = product.category === "animals"
+    ? product.penBuildingId === "chickenCoop" ? "Chicken Coop" : "Cow Pen"
+    : "";
+  const canSendToMarket = isBarnSellableProduct(product);
+  if (!animalTargetLabel && !canSendToMarket) {
+    return "";
+  }
+
+  return `
+    <div
+      class="barn-item-context-menu"
+      data-barn-context-menu
+      style="left:${barnItemContextMenu.left}px; top:${barnItemContextMenu.top}px;"
+    >
+      ${
+        animalTargetLabel
+          ? `
+            <button type="button" class="barn-item-context-menu__button" data-barn-context-pen="${product.id}">
+              Send to ${animalTargetLabel}
+            </button>
+          `
+          : ""
+      }
+      ${
+        canSendToMarket && !animalTargetLabel
+          ? `
+            <button type="button" class="barn-item-context-menu__button" data-barn-context-send="${product.id}">
+              Send to market
+            </button>
+          `
+          : ""
+      }
+    </div>
+  `;
 }
 
 function renderDashboardPanel() {
@@ -855,21 +914,25 @@ function renderDashboardPanel() {
             `)
             .join("")}
         </div>
-        <div class="dashboard-sidebar__bottom">
-          <button
-            type="button"
-            class="dashboard-nav-button dashboard-nav-button--basket ${activeDashboardSection === "basket" ? "is-active" : ""}"
-            data-dashboard-section="${DASHBOARD_BASKET_SECTION.key}"
-          >
-            <span class="dashboard-nav-button__icon" aria-hidden="true">${DASHBOARD_BASKET_SECTION.icon}</span>
-            <span class="dashboard-nav-button__label">${DASHBOARD_BASKET_SECTION.label}</span>
-            <span class="dashboard-nav-button__meta">${basketCount}</span>
-          </button>
-        </div>
       </aside>
+      <div class="dashboard-top-actions">
+        <button
+          type="button"
+          class="dashboard-basket-button ${isDashboardBasketOpen ? "is-active" : ""}"
+          data-dashboard-basket-toggle
+          aria-expanded="${isDashboardBasketOpen ? "true" : "false"}"
+          aria-label="Open basket"
+        >
+          <span class="dashboard-basket-button__icon" aria-hidden="true">🧺</span>
+          <span class="dashboard-basket-button__label">Basket</span>
+          <span class="dashboard-basket-button__count">${basketCount}</span>
+        </button>
+      </div>
       <div class="dashboard-main">
         ${renderDashboardSection(activeDashboardSection)}
       </div>
+      ${renderDashboardBasketDrawer()}
+      ${renderBarnItemContextMenu()}
       ${renderBarnSendToMarketDropZone()}
     </div>
   `;
@@ -960,6 +1023,33 @@ function openPanel(panelKey, panelRoot, contentRoot, titleRoot, tabRoot) {
 }
 
 function handlePanelAction(event) {
+  const contextSendButton = event.target.closest("[data-barn-context-send]");
+  if (contextSendButton) {
+    addProductToSellStand(contextSendButton.dataset.barnContextSend);
+    barnItemContextMenu = null;
+    renderDashboardIfVisible();
+    return;
+  }
+
+  const contextPenButton = event.target.closest("[data-barn-context-pen]");
+  if (contextPenButton) {
+    addAnimalToPen(contextPenButton.dataset.barnContextPen);
+    barnItemContextMenu = null;
+    renderDashboardIfVisible();
+    return;
+  }
+
+  if (barnItemContextMenu && !event.target.closest("[data-barn-context-menu]")) {
+    barnItemContextMenu = null;
+    renderDashboardIfVisible();
+  }
+
+  if (event.target.closest("[data-dashboard-basket-toggle]")) {
+    isDashboardBasketOpen = !isDashboardBasketOpen;
+    renderDashboardIfVisible();
+    return;
+  }
+
   const backButton = event.target.closest("[data-dashboard-back]");
   if (backButton) {
     if (backButton.dataset.dashboardBack === "shop") {
@@ -1070,12 +1160,6 @@ function handlePanelAction(event) {
     return;
   }
 
-  const removeAllShoppingButton = event.target.closest("[data-shop-remove-all]");
-  if (removeAllShoppingButton) {
-    removeAllShoppingItem(removeAllShoppingButton.dataset.shopRemoveAll);
-    return;
-  }
-
   const addShoppingButton = event.target.closest("[data-shop-add]");
   if (addShoppingButton) {
     addShoppingItem(addShoppingButton.dataset.shopAdd);
@@ -1096,6 +1180,7 @@ function handlePanelAction(event) {
   if (buyCell) {
     addShoppingItem(buyCell.dataset.shopBuy);
     activeDashboardSection = "shop";
+    isDashboardBasketOpen = true;
     renderDashboardIfVisible();
     if (activeDashboardShopSection) {
       scrollDashboardSection(`shop-${activeDashboardShopSection}`);
@@ -1125,6 +1210,50 @@ function handlePanelAction(event) {
     animalFeeder: buildAnimalFeeder,
   };
   actions[buildButton.dataset.buildPage]?.();
+}
+
+function getBarnContextMenuPosition(event) {
+  const menuWidth = 148;
+  const menuHeight = 42;
+  const dashboardLayout = event.target.closest(".dashboard-layout") || dashboardContentRoot?.querySelector(".dashboard-layout");
+  const bounds = dashboardLayout?.getBoundingClientRect();
+  const originLeft = bounds?.left || 0;
+  const originTop = bounds?.top || 0;
+  const maxWidth = bounds?.width || window.innerWidth;
+  const maxHeight = bounds?.height || window.innerHeight;
+  const left = event.clientX - originLeft;
+  const top = event.clientY - originTop;
+
+  return {
+    left: Math.min(maxWidth - menuWidth - 8, Math.max(8, left)),
+    top: Math.min(maxHeight - menuHeight - 8, Math.max(8, top)),
+  };
+}
+
+function handleBarnItemContextMenu(event) {
+  const tile = event.target.closest("[data-barn-drag-product]");
+  if (!tile) {
+    if (barnItemContextMenu) {
+      barnItemContextMenu = null;
+      renderDashboardIfVisible();
+    }
+    return;
+  }
+
+  const product = getProduct(tile.dataset.barnDragProduct);
+  if (!isBarnSellableProduct(product) && product?.category !== "animals") {
+    return;
+  }
+
+  event.preventDefault();
+  sidePanelTooltip?.hide();
+  const position = getBarnContextMenuPosition(event);
+  barnItemContextMenu = {
+    productId: product.id,
+    left: position.left,
+    top: position.top,
+  };
+  renderDashboardIfVisible();
 }
 
 function clearBarnItemDrag() {
@@ -1338,6 +1467,15 @@ function handlePanelKeydown(event) {
   scrollDashboardSection(`shop-${activeDashboardShopSection}`);
 }
 
+function handlePanelInput(event) {
+  const quantityInput = event.target.closest("[data-shop-quantity]");
+  if (!quantityInput) {
+    return;
+  }
+
+  setShoppingItemQuantity(quantityInput.dataset.shopQuantity, quantityInput.value);
+}
+
 export function mountSidePanels() {
   const tabRoot = document.querySelector("[data-side-tabs]");
   const panelRoot = document.querySelector("[data-side-panel]");
@@ -1347,7 +1485,9 @@ export function mountSidePanels() {
     return;
   }
 
-  sidePanelTooltip = attachSeedInfoTooltip(contentRoot);
+  sidePanelTooltip = attachSeedInfoTooltip(contentRoot, {
+    isEnabled: (_productId, itemElement) => Boolean(itemElement?.closest(".dashboard-table-row--shop")),
+  });
   updateTabs(tabRoot, null);
 
   const render = () => {
@@ -1373,7 +1513,9 @@ export function mountSidePanels() {
   });
 
   contentRoot.addEventListener("click", handlePanelAction);
+  contentRoot.addEventListener("contextmenu", handleBarnItemContextMenu);
   contentRoot.addEventListener("keydown", handlePanelKeydown);
+  contentRoot.addEventListener("change", handlePanelInput);
   contentRoot.addEventListener("pointerdown", handleBarnItemPointerDown);
   contentRoot.addEventListener("toggle", (event) => {
     const section = event.target.closest?.("[data-section-key]");

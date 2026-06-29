@@ -9,6 +9,7 @@ import { bootstrapGamePersistence } from "./persistence.js";
 import { clearSelectedInventoryItem } from "./inventory.js";
 import { mountInfoPanel } from "./infoPanel.js";
 import { mountSidePanels } from "./sidePanels.js";
+import { mountSceneCamera } from "./sceneCamera.js";
 import { onStateChange, restartFarm, showCell, stabilizeLayoutPositions, state } from "./state.js";
 
 const statusRoot = document.getElementById("status");
@@ -34,6 +35,7 @@ mountChickenCoop(chickenCoopMount);
 mountInfoPanel();
 mountSidePanels();
 mountFarmCursors();
+mountSceneCamera();
 onStateChange(renderStatus);
 renderStatus();
 window.addEventListener("resize", () => {

@@ -216,7 +216,7 @@ export function attachSeedInfoTooltip(container, { isEnabled = () => true } = {}
 
   function show(event) {
     const itemElement = event.target.closest("[data-item-info-product]");
-    if (!itemElement || !isEnabled(itemElement.dataset.itemInfoProduct)) {
+    if (!itemElement || !isEnabled(itemElement.dataset.itemInfoProduct, itemElement)) {
       return;
     }
 

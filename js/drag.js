@@ -1,4 +1,5 @@
 import { deleteCellByKey, moveCell, moveFarmPlot, state } from "./state.js";
+import { getSceneScale, screenDeltaToWorld } from "./sceneCamera.js";
 
 const GRID_SIZE = 24;
 const DRAG_THRESHOLD = 4;
@@ -63,13 +64,14 @@ function getElementOffset(element, axis) {
 function getWorkspaceRect(workspace, element) {
   const workspaceRect = workspace.getBoundingClientRect();
   const rect = element.getBoundingClientRect();
+  const scale = getSceneScale();
   return {
-    left: rect.left - workspaceRect.left,
-    top: rect.top - workspaceRect.top,
-    right: rect.right - workspaceRect.left,
-    bottom: rect.bottom - workspaceRect.top,
-    width: rect.width,
-    height: rect.height,
+    left: (rect.left - workspaceRect.left) / scale,
+    top: (rect.top - workspaceRect.top) / scale,
+    right: (rect.right - workspaceRect.left) / scale,
+    bottom: (rect.bottom - workspaceRect.top) / scale,
+    width: rect.width / scale,
+    height: rect.height / scale,
   };
 }
 
@@ -131,11 +133,14 @@ function overlaps(left, top, width, height, rect, padding = 0) {
 
 function getViewportRect(workspace, left, top, width, height) {
   const workspaceRect = workspace.getBoundingClientRect();
+  const scale = getSceneScale();
   return {
-    left: workspaceRect.left + left,
-    top: workspaceRect.top + top,
-    right: workspaceRect.left + left + width,
-    bottom: workspaceRect.top + top + height,
+    left: workspaceRect.left + left * scale,
+    top: workspaceRect.top + top * scale,
+    right: workspaceRect.left + (left + width) * scale,
+    bottom: workspaceRect.top + (top + height) * scale,
+    width: width * scale,
+    height: height * scale,
   };
 }
 
@@ -146,7 +151,7 @@ function isInsideDeleteZone(workspace, left, top, width, height) {
   }
 
   const cellRect = getViewportRect(workspace, left, top, width, height);
-  return overlaps(cellRect.left, cellRect.top, width, height, rect, 0);
+  return overlaps(cellRect.left, cellRect.top, cellRect.width, cellRect.height, rect, 0);
 }
 
 function findNearestSnap(rawValue, candidates) {
@@ -277,16 +282,18 @@ export function mountMovableCell(container, { key, selector, dragHandle = null, 
       return;
     }
 
-    const deltaX = event.clientX - dragState.startX;
-    const deltaY = event.clientY - dragState.startY;
+    const screenDeltaX = event.clientX - dragState.startX;
+    const screenDeltaY = event.clientY - dragState.startY;
 
-    if (!dragState.moved && Math.hypot(deltaX, deltaY) < DRAG_THRESHOLD) {
+    if (!dragState.moved && Math.hypot(screenDeltaX, screenDeltaY) < DRAG_THRESHOLD) {
       return;
     }
 
     dragState.moved = true;
     dragState.cell.classList.add("is-dragging");
     document.body.classList.add("is-dragging-cell");
+    const deltaX = screenDeltaToWorld(screenDeltaX);
+    const deltaY = screenDeltaToWorld(screenDeltaY);
     const position = clampToWorkspace(
       dragState.workspace,
       dragState.startLeft + deltaX,

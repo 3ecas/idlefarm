@@ -679,12 +679,11 @@ function getObstacleRects(excludePlotId = null) {
     return elements
       .filter((element) => element.dataset.cellKey !== excludePlotId)
       .map((element) => {
-        const rect = element.getBoundingClientRect();
         return {
-          left: rect.left,
-          top: rect.top,
-          width: rect.width,
-          height: rect.height,
+          left: element.offsetLeft,
+          top: element.offsetTop,
+          width: element.offsetWidth,
+          height: element.offsetHeight,
         };
       });
   }
@@ -3127,13 +3126,20 @@ export function removeShoppingItem(productId) {
   return true;
 }
 
-export function removeAllShoppingItem(productId) {
-  if (!state.shopping.items[productId]) {
+export function setShoppingItemQuantity(productId, quantity) {
+  const product = getProduct(productId);
+  const nextQuantity = Math.max(0, Math.floor(Number(quantity) || 0));
+  if (!product) {
     return false;
   }
 
-  delete state.shopping.items[productId];
-  state.message = "Removed.";
+  if (nextQuantity > 0) {
+    state.shopping.items[productId] = nextQuantity;
+  } else {
+    delete state.shopping.items[productId];
+  }
+
+  state.message = nextQuantity > 0 ? `${product.marketName} x${nextQuantity}.` : "Removed.";
   notify();
   return true;
 }
@@ -3214,11 +3220,11 @@ export function getPlotStatusLabel(plot) {
   }
 
   if (plot.stage === FARM_STAGE_GROWING) {
-    return "till growing";
+    return "growing";
   }
 
   if (plot.stage === FARM_STAGE_MATURE) {
-    return "harvest";
+    return "ready to harvest";
   }
 
   return "";

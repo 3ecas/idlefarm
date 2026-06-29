@@ -172,15 +172,13 @@ function clampToWorkspace(workspace, left, top, size = getCellDragBounds("farm")
 }
 
 function getPlotGlyph(plot) {
-  if (plot.stage === "mature") {
-    return "🌾";
+  if (!plot?.cropId) {
+    return "";
   }
 
-  if (plot.stage === "growing") {
-    return "🌱";
-  }
-
-  return "";
+  const plantedProduct = getProduct(plot.cropId);
+  const cropProduct = plantedProduct?.cropProductId ? getProduct(plantedProduct.cropProductId) : plantedProduct;
+  return cropProduct?.icon || plantedProduct?.icon || "";
 }
 
 function getAvailableSeedEntries() {
@@ -428,7 +426,7 @@ export function mountPlot(container) {
                 const nameLabel = getPlotDisplayLabel(tile);
                 const statusLabel = getPlotStatusLabel(tile);
                 const growthProgress = getPlotGrowthProgress(tile);
-                const statusText = stage === "growing" ? `${statusLabel} ${growthProgress}%` : statusLabel;
+                const statusText = stage === "growing" ? "" : statusLabel;
                 return `
                   <button
                     type="button"
