@@ -1,4 +1,4 @@
-import { getProduct, sortProductsByCoinValue } from "./catalog.js";
+import { getProduct, getProductSellPrice, sortProductsByCoinValue } from "./catalog.js";
 import {
   addAnimalFoodToPen,
   addAnimalToPen,
@@ -209,7 +209,7 @@ function handleSeedDragPointerCancel() {
 }
 
 function isSellableProduct(product) {
-  return product.category === "crops" || product.category === "processed";
+  return getProductSellPrice(product.id) > 0;
 }
 
 function getActiveTab() {
@@ -235,6 +235,7 @@ function renderBarnTile(product, quantity) {
 
   return renderInventoryTile({
     title: product.inventoryName,
+    icon: product.icon,
     meta: `x${quantity}`,
     className: "barn-inventory-tile",
     dataAttributes,

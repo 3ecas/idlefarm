@@ -1,6 +1,7 @@
 const seed = {
   id: "cabbageSeed",
   category: "seeds",
+  icon: "🥬",
   marketName: "Cabbage",
   inventoryName: "Cabbage seed",
   price: 2,
@@ -10,6 +11,7 @@ const seed = {
 const crop = {
   id: "cabbageCrop",
   category: "crops",
+  icon: "🥬",
   marketName: "Cabbage",
   inventoryName: "Cabbage",
   price: 0,

@@ -31,7 +31,10 @@ function clampToWorkspace(workspace, left, top) {
 function renderProductButton(product) {
   return `
     <button type="button" class="market-product" data-product-id="${product.id}" data-item-info-product="${product.id}">
-      <span class="market-product__name">${product.marketName}</span>
+      <span class="market-product__name-row">
+        ${product.icon ? `<span class="item-icon market-product__icon" aria-hidden="true">${product.icon}</span>` : ""}
+        <span class="market-product__name">${product.marketName}</span>
+      </span>
       <span class="market-product__price">
         <span class="price-coin" aria-hidden="true"></span>
         <span class="price-value">${product.price}</span>
@@ -44,7 +47,10 @@ function renderLandPlotButton() {
   const cost = getNextLandPlotCost();
   return `
     <button type="button" class="market-product market-product--upgrade" data-buy-land-plot>
-      <span class="market-product__name">Land plot</span>
+      <span class="market-product__name-row">
+        <span class="item-icon market-product__icon" aria-hidden="true">⬚</span>
+        <span class="market-product__name">Land plot</span>
+      </span>
       <span class="market-product__price">
         <span class="price-coin" aria-hidden="true"></span>
         <span class="price-value">${cost}</span>

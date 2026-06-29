@@ -1,5 +1,4 @@
 import { mountPlot } from "./plot.js";
-import { mountSellMarket } from "./sellMarket.js";
 import { mountAnimalFeeder } from "./animalFeeder.js";
 import { mountAnimalPen } from "./animalPen.js";
 import { mountBakery } from "./bakery.js";
@@ -19,7 +18,6 @@ const bakeryMount = document.getElementById("bakery-mount");
 const animalFeederMount = document.getElementById("animal-feeder-mount");
 const animalPenMount = document.getElementById("animal-pen-mount");
 const chickenCoopMount = document.getElementById("chicken-coop-mount");
-const sellMarketMount = document.getElementById("sell-market-mount");
 const restartButton = document.querySelector("[data-restart-farm]");
 
 function renderStatus() {
@@ -27,14 +25,12 @@ function renderStatus() {
 }
 
 bootstrapGamePersistence();
-showCell("sellMarket");
 mountPlot(cellMount);
 mountMill(millMount);
 mountBakery(bakeryMount);
 mountAnimalFeeder(animalFeederMount);
 mountAnimalPen(animalPenMount);
 mountChickenCoop(chickenCoopMount);
-mountSellMarket(sellMarketMount);
 mountInfoPanel();
 mountSidePanels();
 mountFarmCursors();
@@ -56,6 +52,5 @@ document.addEventListener("pointerdown", (event) => {
 if (restartButton) {
   restartButton.addEventListener("click", () => {
     restartFarm();
-    showCell("sellMarket");
   });
 }

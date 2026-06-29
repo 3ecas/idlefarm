@@ -1,6 +1,7 @@
 const seed = {
   id: "cornSeed",
   category: "seeds",
+  icon: "🌽",
   marketName: "Corn",
   inventoryName: "Corn seed",
   price: 3,
@@ -10,6 +11,7 @@ const seed = {
 const crop = {
   id: "cornCrop",
   category: "crops",
+  icon: "🌽",
   marketName: "Corn",
   inventoryName: "Corn",
   price: 0,

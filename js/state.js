@@ -19,6 +19,10 @@ const FARM_STAGE_EMPTY = "empty";
 const FARM_STAGE_PLANTED = "planted";
 const FARM_STAGE_GROWING = "growing";
 const FARM_STAGE_MATURE = "mature";
+const FARM_PLOT_MIN_SPAN = 1;
+const FARM_PLOT_MAX_SPAN = 3;
+const FARM_PLOT_TILE_SEPARATOR = ":";
+const FARM_PLOT_JOIN_TOLERANCE = 3;
 export const LAYOUT_SAVE_VERSION = "12";
 const STARTING_COINS = 5;
 const DEFAULT_HIDDEN_CELL_KEYS = ["market", "sellMarket", "barn", "build", "fastItems"];
@@ -285,6 +289,91 @@ function getCenteredStarterFarmPosition() {
   }, farmSize);
 }
 
+function normalizeFarmPlotSpan(value) {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) {
+    return FARM_PLOT_MIN_SPAN;
+  }
+
+  return Math.max(FARM_PLOT_MIN_SPAN, Math.min(FARM_PLOT_MAX_SPAN, Math.round(numericValue)));
+}
+
+export function getFarmPlotSize(plot = {}) {
+  const columns = normalizeFarmPlotSpan(plot.columns);
+  const rows = normalizeFarmPlotSpan(plot.rows);
+  return {
+    columns,
+    rows,
+    width: FARM_PLOT_SIZE * columns,
+    height: FARM_PLOT_SIZE * rows,
+    area: columns * rows,
+  };
+}
+
+function createEmptyFarmPlotTile() {
+  return {
+    cropId: null,
+    stage: FARM_STAGE_EMPTY,
+    growCompleteAt: null,
+  };
+}
+
+function normalizeFarmPlotTile(tile = {}) {
+  const stage = tile.stage === FARM_STAGE_PLANTED || tile.stage === FARM_STAGE_GROWING || tile.stage === FARM_STAGE_MATURE
+    ? tile.stage
+    : FARM_STAGE_EMPTY;
+
+  return {
+    cropId: typeof tile.cropId === "string" ? tile.cropId : null,
+    stage,
+    growCompleteAt: Number.isFinite(tile.growCompleteAt) ? tile.growCompleteAt : null,
+  };
+}
+
+function normalizeFarmPlotTiles(plot, columns, rows) {
+  const tileCount = columns * rows;
+  const tiles = Array.from({ length: tileCount }, () => createEmptyFarmPlotTile());
+
+  if (Array.isArray(plot?.tiles)) {
+    for (let index = 0; index < Math.min(plot.tiles.length, tileCount); index += 1) {
+      tiles[index] = normalizeFarmPlotTile(plot.tiles[index]);
+    }
+    return tiles;
+  }
+
+  if (typeof plot?.cropId === "string") {
+    tiles[0] = normalizeFarmPlotTile({
+      cropId: plot.cropId,
+      stage: plot.stage,
+      growCompleteAt: plot.growCompleteAt,
+    });
+  }
+
+  return tiles;
+}
+
+export function getFarmPlotTileId(plotId, tileIndex = 0) {
+  return `${plotId}${FARM_PLOT_TILE_SEPARATOR}${Math.max(0, Number(tileIndex) || 0)}`;
+}
+
+function parseFarmPlotTileId(tileId) {
+  if (typeof tileId !== "string") {
+    return { plotId: "", tileIndex: 0 };
+  }
+
+  const separatorIndex = tileId.lastIndexOf(FARM_PLOT_TILE_SEPARATOR);
+  if (separatorIndex === -1) {
+    return { plotId: tileId, tileIndex: 0 };
+  }
+
+  const plotId = tileId.slice(0, separatorIndex);
+  const tileIndex = Number(tileId.slice(separatorIndex + 1));
+  return {
+    plotId,
+    tileIndex: Number.isInteger(tileIndex) && tileIndex >= 0 ? tileIndex : 0,
+  };
+}
+
 function getTopRightSellMarketPosition() {
   const workspace = getWorkspaceSize();
   const marketSize = getCellSize("sellMarket");
@@ -300,6 +389,9 @@ function createStarterFarmPlots(preferredPosition = getCenteredStarterFarmPositi
     id: "farm-plot-0",
     left: position.left,
     top: position.top,
+    columns: 1,
+    rows: 1,
+    tiles: [createEmptyFarmPlotTile()],
     cropId: null,
     stage: FARM_STAGE_EMPTY,
     growCompleteAt: null,
@@ -699,14 +791,15 @@ function isCellRectFree(left, top, width, height, obstacles, gap = 8) {
 }
 
 function isFarmPlotPositionFree(candidate, plots, excludePlotId = null) {
+  const candidateSize = getFarmPlotSize(candidate);
   const obstacles = getObstacleRects(excludePlotId).concat(
     plots
       .filter((plot) => plot.id !== excludePlotId)
       .map((plot) => ({
         left: plot.left,
         top: plot.top,
-        width: FARM_PLOT_SIZE,
-        height: FARM_PLOT_SIZE,
+        width: getFarmPlotSize(plot).width,
+        height: getFarmPlotSize(plot).height,
       }))
   );
 
@@ -714,8 +807,8 @@ function isFarmPlotPositionFree(candidate, plots, excludePlotId = null) {
     (rect) => !rectsOverlapWithGap(
       candidate.left,
       candidate.top,
-      FARM_PLOT_SIZE,
-      FARM_PLOT_SIZE,
+      candidateSize.width,
+      candidateSize.height,
       rect,
       FARM_PLOT_SPAWN_GAP
     )
@@ -723,18 +816,19 @@ function isFarmPlotPositionFree(candidate, plots, excludePlotId = null) {
 }
 
 function isFarmPlotPositionFreeFromPlots(candidate, plots, excludePlotId = null) {
+  const candidateSize = getFarmPlotSize(candidate);
   return plots
     .filter((plot) => plot.id !== excludePlotId)
     .every((plot) => !rectsOverlapWithGap(
       candidate.left,
       candidate.top,
-      FARM_PLOT_SIZE,
-      FARM_PLOT_SIZE,
+      candidateSize.width,
+      candidateSize.height,
       {
         left: plot.left,
         top: plot.top,
-        width: FARM_PLOT_SIZE,
-        height: FARM_PLOT_SIZE,
+        width: getFarmPlotSize(plot).width,
+        height: getFarmPlotSize(plot).height,
       },
       FARM_PLOT_SPAWN_GAP
     ));
@@ -742,8 +836,9 @@ function isFarmPlotPositionFreeFromPlots(candidate, plots, excludePlotId = null)
 
 function clampFarmPlotToWorkspace(position) {
   const workspace = getWorkspaceSize();
-  const maxLeft = Math.max(0, workspace.width - FARM_PLOT_SIZE);
-  const maxTop = Math.max(0, workspace.height - FARM_PLOT_SIZE);
+  const size = getFarmPlotSize(position);
+  const maxLeft = Math.max(0, workspace.width - size.width);
+  const maxTop = Math.max(0, workspace.height - size.height);
 
   return {
     left: snapToGrid(Math.min(maxLeft, Math.max(0, position.left))),
@@ -753,20 +848,30 @@ function clampFarmPlotToWorkspace(position) {
 
 function createFarmPlotRecord(id, preferredPosition, existingPlots) {
   const workspace = getWorkspaceSize();
-  const maxLeft = Math.max(0, workspace.width - FARM_PLOT_SIZE);
-  const maxTop = Math.max(0, workspace.height - FARM_PLOT_SIZE);
-  const searchOrigin = clampFarmPlotToWorkspace(preferredPosition || getCenteredStarterFarmPosition());
+  const dimensions = getFarmPlotSize(preferredPosition);
+  const fallbackPosition = getCenteredStarterFarmPosition();
+  const basePosition = {
+    left: Number.isFinite(preferredPosition?.left) ? preferredPosition.left : fallbackPosition.left,
+    top: Number.isFinite(preferredPosition?.top) ? preferredPosition.top : fallbackPosition.top,
+  };
+  const maxLeft = Math.max(0, workspace.width - dimensions.width);
+  const maxTop = Math.max(0, workspace.height - dimensions.height);
+  const searchOrigin = clampFarmPlotToWorkspace({
+    ...basePosition,
+    columns: dimensions.columns,
+    rows: dimensions.rows,
+  });
   const visitedPositions = new Set();
 
   function getAvailableCandidate(position) {
-    const candidate = clampFarmPlotToWorkspace(position);
+    const candidate = clampFarmPlotToWorkspace({ ...position, columns: dimensions.columns, rows: dimensions.rows });
     const key = `${candidate.left}:${candidate.top}`;
     if (visitedPositions.has(key)) {
       return null;
     }
 
     visitedPositions.add(key);
-    return isFarmPlotPositionFree(candidate, existingPlots, id) ? candidate : null;
+    return isFarmPlotPositionFree({ ...candidate, columns: dimensions.columns, rows: dimensions.rows }, existingPlots, id) ? candidate : null;
   }
 
   const originCandidate = getAvailableCandidate(searchOrigin);
@@ -778,7 +883,7 @@ function createFarmPlotRecord(id, preferredPosition, existingPlots) {
     };
   }
 
-  const maxSearchRadius = Math.max(maxLeft, maxTop) + FARM_PLOT_SIZE;
+  const maxSearchRadius = Math.max(maxLeft, maxTop) + Math.max(dimensions.width, dimensions.height);
   for (let radius = GRID_SIZE; radius <= maxSearchRadius; radius += GRID_SIZE) {
     for (let offset = -radius; offset <= radius; offset += GRID_SIZE) {
       const topCandidate = getAvailableCandidate({
@@ -864,14 +969,18 @@ function normalizeFarmPlot(plot, index, existingPlots = []) {
   }
 
   const id = typeof plot.id === "string" && plot.id ? plot.id : `farm-plot-${index}`;
+  const columns = normalizeFarmPlotSpan(plot.columns);
+  const rows = normalizeFarmPlotSpan(plot.rows);
   const preferredPosition = {
     left: Number.isFinite(plot.left) ? plot.left : DEFAULT_CELL_POSITIONS.farm.left + index * GRID_SIZE,
     top: Number.isFinite(plot.top) ? plot.top : DEFAULT_CELL_POSITIONS.farm.top + index * GRID_SIZE,
+    columns,
+    rows,
   };
   const clampedPosition = clampFarmPlotToWorkspace(preferredPosition);
-  const position = isFarmPlotPositionFreeFromPlots(clampedPosition, existingPlots, id)
+  const position = isFarmPlotPositionFreeFromPlots({ ...clampedPosition, columns, rows }, existingPlots, id)
     ? { id, ...clampedPosition }
-    : createFarmPlotRecord(id, clampedPosition, existingPlots);
+    : createFarmPlotRecord(id, { ...clampedPosition, columns, rows }, existingPlots);
   const stage = plot.stage === FARM_STAGE_PLANTED || plot.stage === FARM_STAGE_GROWING || plot.stage === FARM_STAGE_MATURE
     ? plot.stage
     : FARM_STAGE_EMPTY;
@@ -879,9 +988,12 @@ function normalizeFarmPlot(plot, index, existingPlots = []) {
     id,
     left: position.left,
     top: position.top,
-    cropId: typeof plot.cropId === "string" ? plot.cropId : null,
-    stage,
-    growCompleteAt: Number.isFinite(plot.growCompleteAt) ? plot.growCompleteAt : null,
+    columns,
+    rows,
+    tiles: normalizeFarmPlotTiles({ ...plot, stage }, columns, rows),
+    cropId: null,
+    stage: FARM_STAGE_EMPTY,
+    growCompleteAt: null,
   };
 }
 
@@ -1163,22 +1275,55 @@ function getPlotById(plotId) {
   return state.farm.plots.find((plot) => plot.id === plotId) || null;
 }
 
-function clearPlotGrowthTimer(plotId) {
-  const timerId = growthTimers.get(plotId);
+export function getFarmPlotTileById(tileId) {
+  const { plotId, tileIndex } = parseFarmPlotTileId(tileId);
+  const plot = getPlotById(plotId);
+  if (!plot) {
+    return null;
+  }
+
+  const plotSize = getFarmPlotSize(plot);
+  if (!Array.isArray(plot.tiles) || plot.tiles.length !== plotSize.area) {
+    plot.tiles = normalizeFarmPlotTiles(plot, plotSize.columns, plotSize.rows);
+  }
+
+  const tile = plot.tiles[tileIndex];
+  if (!tile) {
+    return null;
+  }
+
+  return {
+    plot,
+    tile,
+    tileIndex,
+    tileId: getFarmPlotTileId(plot.id, tileIndex),
+  };
+}
+
+function getPlotTiles(plot) {
+  const plotSize = getFarmPlotSize(plot);
+  if (!Array.isArray(plot.tiles) || plot.tiles.length !== plotSize.area) {
+    plot.tiles = normalizeFarmPlotTiles(plot, plotSize.columns, plotSize.rows);
+  }
+  return plot.tiles;
+}
+
+function clearPlotGrowthTimer(tileId) {
+  const timerId = growthTimers.get(tileId);
   if (timerId) {
     window.clearTimeout(timerId);
-    growthTimers.delete(plotId);
+    growthTimers.delete(tileId);
   }
 }
 
-function markPlotMature(plot) {
-  if (!plot) {
+function markPlotMature(tile, tileId) {
+  if (!tile) {
     return false;
   }
 
-  clearPlotGrowthTimer(plot.id);
-  plot.stage = FARM_STAGE_MATURE;
-  plot.growCompleteAt = null;
+  clearPlotGrowthTimer(tileId);
+  tile.stage = FARM_STAGE_MATURE;
+  tile.growCompleteAt = null;
   saveFarmPlots(state.farm.plots);
   if (!hasGrowingPlots() && growthTicker) {
     window.clearInterval(growthTicker);
@@ -1188,33 +1333,38 @@ function markPlotMature(plot) {
   return true;
 }
 
-function schedulePlotGrowth(plot) {
-  if (!plot || plot.stage !== FARM_STAGE_GROWING || !Number.isFinite(plot.growCompleteAt)) {
+function schedulePlotGrowth(tile, tileId) {
+  if (!tile || tile.stage !== FARM_STAGE_GROWING || !Number.isFinite(tile.growCompleteAt)) {
     return;
   }
 
-  clearPlotGrowthTimer(plot.id);
-  const remaining = Math.max(0, plot.growCompleteAt - Date.now());
+  clearPlotGrowthTimer(tileId);
+  const remaining = Math.max(0, tile.growCompleteAt - Date.now());
   if (remaining === 0) {
-    markPlotMature(plot);
+    markPlotMature(tile, tileId);
     return;
   }
 
   const timerId = window.setTimeout(() => {
-    growthTimers.delete(plot.id);
-    markPlotMature(plot);
+    growthTimers.delete(tileId);
+    markPlotMature(tile, tileId);
   }, remaining);
-  growthTimers.set(plot.id, timerId);
+  growthTimers.set(tileId, timerId);
   ensureGrowthTicker();
 }
 
 function hydratePlotGrowthTimers() {
   for (const plot of state.farm.plots) {
-    if (plot.stage === FARM_STAGE_GROWING && Number.isFinite(plot.growCompleteAt)) {
-      schedulePlotGrowth(plot);
-    } else if (plot.stage === FARM_STAGE_GROWING) {
-      plot.stage = FARM_STAGE_PLANTED;
-      plot.growCompleteAt = null;
+    const tiles = getPlotTiles(plot);
+    for (let index = 0; index < tiles.length; index += 1) {
+      const tile = tiles[index];
+      const tileId = getFarmPlotTileId(plot.id, index);
+      if (tile.stage === FARM_STAGE_GROWING && Number.isFinite(tile.growCompleteAt)) {
+        schedulePlotGrowth(tile, tileId);
+      } else if (tile.stage === FARM_STAGE_GROWING) {
+        tile.stage = FARM_STAGE_PLANTED;
+        tile.growCompleteAt = null;
+      }
     }
   }
 
@@ -1222,7 +1372,7 @@ function hydratePlotGrowthTimers() {
 }
 
 function hasGrowingPlots() {
-  return state.farm.plots.some((plot) => plot.stage === FARM_STAGE_GROWING && Number.isFinite(plot.growCompleteAt));
+  return state.farm.plots.some((plot) => getPlotTiles(plot).some((tile) => tile.stage === FARM_STAGE_GROWING && Number.isFinite(tile.growCompleteAt)));
 }
 
 function ensureGrowthTicker() {
@@ -2237,7 +2387,7 @@ export function consumeBarnItem(productId, quantity = 1) {
 
 export function isProductSellable(productId) {
   const product = getProduct(productId);
-  return Boolean(product && (product.category === "crops" || product.category === "processed") && getProductSellPrice(product.id) > 0);
+  return Boolean(product && getProductSellPrice(product.id) > 0);
 }
 
 export function getSellItemQuantity(productId) {
@@ -2285,7 +2435,8 @@ export function addSellItem(productId, quantity = 1) {
   }
 
   const currentQuantity = getSellItemQuantity(productId);
-  const nextQuantity = Math.min(ownedQuantity, currentQuantity + quantity);
+  const availableQuantity = currentQuantity + ownedQuantity;
+  const nextQuantity = Math.min(availableQuantity, currentQuantity + quantity);
   const addedQuantity = nextQuantity - currentQuantity;
   if (addedQuantity <= 0) {
     state.message = "None available.";
@@ -2312,7 +2463,8 @@ export function adjustSellItem(productId, delta) {
   }
 
   const ownedQuantity = getBarnItemQuantity(productId);
-  const nextQuantity = Math.max(0, Math.min(ownedQuantity, currentQuantity + delta));
+  const availableQuantity = currentQuantity + ownedQuantity;
+  const nextQuantity = Math.max(0, Math.min(availableQuantity, currentQuantity + delta));
   const change = nextQuantity - currentQuantity;
   if (change > 0) {
     if (!consumeBarnItemSilently(productId, change)) {
@@ -2433,11 +2585,11 @@ export function plantSelectedSeedOnPlot(plotId) {
   return plantSeedOnPlot(plotId, state.inventory.selectedItemId);
 }
 
-export function plantSeedFromInventoryOnPlot(plotId, seedId) {
-  return plantSeedOnPlot(plotId, seedId);
+export function plantSeedFromInventoryOnPlot(plotTileId, seedId) {
+  return plantSeedOnPlot(plotTileId, seedId);
 }
 
-function plantSeedOnPlot(plotId, seedId) {
+function plantSeedOnPlot(plotTileId, seedId) {
   const selectedProduct = seedId ? getProduct(seedId) : null;
   if (!seedId || !selectedProduct || selectedProduct.category !== "seeds") {
     state.message = "Select a seed first.";
@@ -2445,8 +2597,8 @@ function plantSeedOnPlot(plotId, seedId) {
     return false;
   }
 
-  const plot = getPlotById(plotId);
-  if (!plot || plot.cropId) {
+  const tileRecord = getFarmPlotTileById(plotTileId);
+  if (!tileRecord || tileRecord.tile.cropId) {
     state.message = "Plot is occupied.";
     notify();
     return false;
@@ -2458,61 +2610,63 @@ function plantSeedOnPlot(plotId, seedId) {
     return false;
   }
 
-  plot.cropId = seedId;
-  plot.stage = FARM_STAGE_PLANTED;
-  plot.growCompleteAt = null;
-  clearPlotGrowthTimer(plot.id);
+  tileRecord.tile.cropId = seedId;
+  tileRecord.tile.stage = FARM_STAGE_PLANTED;
+  tileRecord.tile.growCompleteAt = null;
+  clearPlotGrowthTimer(tileRecord.tileId);
   saveFarmState();
   state.message = `${selectedProduct.inventoryName} planted.`;
   notify();
   return true;
 }
 
-export function waterPlot(plotId) {
-  const plot = getPlotById(plotId);
-  if (!plot || !plot.cropId || plot.stage === FARM_STAGE_MATURE) {
+export function waterPlot(plotTileId) {
+  const tileRecord = getFarmPlotTileById(plotTileId);
+  if (!tileRecord || !tileRecord.tile.cropId || tileRecord.tile.stage === FARM_STAGE_MATURE) {
     state.message = "Nothing to water.";
     notify();
     return false;
   }
 
-  plot.stage = FARM_STAGE_GROWING;
-  plot.growCompleteAt = Date.now() + getPlotGrowthDurationMs(plot);
+  tileRecord.tile.stage = FARM_STAGE_GROWING;
+  tileRecord.tile.growCompleteAt = Date.now() + getPlotGrowthDurationMs(tileRecord.tile);
   saveFarmState();
-  schedulePlotGrowth(plot);
+  schedulePlotGrowth(tileRecord.tile, tileRecord.tileId);
   state.message = "Watered.";
   notify();
   return true;
 }
 
-export function harvestPlot(plotId) {
-  const plot = getPlotById(plotId);
-  if (!plot || !plot.cropId) {
+export function harvestPlot(plotTileId) {
+  const tileRecord = getFarmPlotTileById(plotTileId);
+  if (!tileRecord || !tileRecord.tile.cropId) {
     state.message = "Not ready yet.";
     notify();
     return false;
   }
 
-  if (plot.stage === FARM_STAGE_PLANTED || plot.stage === FARM_STAGE_GROWING) {
-    grantBarnItemSilently(plot.cropId, 1);
-    plot.cropId = null;
-    plot.stage = FARM_STAGE_EMPTY;
-    plot.growCompleteAt = null;
-    clearPlotGrowthTimer(plot.id);
+  const tile = tileRecord.tile;
+
+  if (tile.stage === FARM_STAGE_PLANTED || tile.stage === FARM_STAGE_GROWING) {
+    grantBarnItemSilently(tile.cropId, 1);
+    tile.cropId = null;
+    tile.stage = FARM_STAGE_EMPTY;
+    tile.growCompleteAt = null;
+    clearPlotGrowthTimer(tileRecord.tileId);
     saveFarmState();
     state.message = "Seed recovered.";
     notify();
     return true;
   }
 
-  if (plot.stage !== FARM_STAGE_MATURE) {
+  if (tile.stage !== FARM_STAGE_MATURE) {
     state.message = "Not ready yet.";
     notify();
     return false;
   }
 
-  const plantedProduct = getProduct(plot.cropId);
-  const harvestProductId = plantedProduct?.cropProductId || plot.cropId;
+  const plantedProduct = getProduct(tile.cropId);
+  const harvestProductId = plantedProduct?.cropProductId || tile.cropId;
   const cropProduct = getProduct(harvestProductId);
   const harvestQuantity = Number.isFinite(cropProduct?.harvestYield) ? cropProduct.harvestYield : 1;
   grantBarnItemSilently(harvestProductId, harvestQuantity);
@@ -2522,10 +2676,10 @@ export function harvestPlot(plotId) {
     }
   }
   autoFeedAnimalPens({ shouldNotify: false });
-  plot.cropId = null;
-  plot.stage = FARM_STAGE_EMPTY;
-  plot.growCompleteAt = null;
-  clearPlotGrowthTimer(plot.id);
+  tile.cropId = null;
+  tile.stage = FARM_STAGE_EMPTY;
+  tile.growCompleteAt = null;
+  clearPlotGrowthTimer(tileRecord.tileId);
   saveFarmState();
   state.message = "Harvested.";
   notify();
@@ -2533,12 +2687,17 @@ export function harvestPlot(plotId) {
 }
 
 export function getNextLandPlotCost() {
+  return getFarmPlotCost();
+}
+
+export function getFarmPlotCost(plot = {}) {
   const ownedPlotCount = Math.max(0, state.farm.plots.length);
+  const area = getFarmPlotSize(plot).area;
   if (ownedPlotCount === 0) {
     return 0;
   }
 
-  return Math.ceil(FARM_PLOT_BASE_COST * Math.pow(FARM_PLOT_PRICE_GROWTH, ownedPlotCount - 1));
+  return Math.ceil(FARM_PLOT_BASE_COST * area * Math.pow(FARM_PLOT_PRICE_GROWTH, ownedPlotCount - 1));
 }
 
 function clearFarmPlotAnimation(plotId) {
@@ -2560,16 +2719,180 @@ function markFarmPlotEntering(plotId) {
   window.setTimeout(() => clearFarmPlotAnimation(plotId), 500);
 }
 
+function valuesNearlyEqual(first, second, tolerance = FARM_PLOT_JOIN_TOLERANCE) {
+  return Math.abs(first - second) <= tolerance;
+}
+
+function getFarmPlotRect(plot) {
+  const size = getFarmPlotSize(plot);
+  return {
+    left: plot.left,
+    top: plot.top,
+    right: plot.left + size.width,
+    bottom: plot.top + size.height,
+    columns: size.columns,
+    rows: size.rows,
+    area: size.area,
+  };
+}
+
+function getJoinCandidateRect(firstPlot, secondPlot) {
+  const first = getFarmPlotRect(firstPlot);
+  const second = getFarmPlotRect(secondPlot);
+  const left = Math.min(first.left, second.left);
+  const top = Math.min(first.top, second.top);
+  const right = Math.max(first.right, second.right);
+  const bottom = Math.max(first.bottom, second.bottom);
+  const rawColumns = (right - left) / FARM_PLOT_SIZE;
+  const rawRows = (bottom - top) / FARM_PLOT_SIZE;
+  const columns = Math.round(rawColumns);
+  const rows = Math.round(rawRows);
+
+  if (
+    columns < FARM_PLOT_MIN_SPAN ||
+    rows < FARM_PLOT_MIN_SPAN ||
+    columns > FARM_PLOT_MAX_SPAN ||
+    rows > FARM_PLOT_MAX_SPAN ||
+    !valuesNearlyEqual(rawColumns * FARM_PLOT_SIZE, columns * FARM_PLOT_SIZE) ||
+    !valuesNearlyEqual(rawRows * FARM_PLOT_SIZE, rows * FARM_PLOT_SIZE)
+  ) {
+    return null;
+  }
+
+  const unionArea = columns * rows;
+  const sourceArea = first.area + second.area;
+  if (unionArea !== sourceArea) {
+    return null;
+  }
+
+  return { left, top, columns, rows, area: unionArea };
+}
+
+function copyFarmPlotTilesInto(targetTiles, sourcePlot, targetRect) {
+  const sourceSize = getFarmPlotSize(sourcePlot);
+  const sourceTiles = getPlotTiles(sourcePlot);
+  const columnOffset = Math.round((sourcePlot.left - targetRect.left) / FARM_PLOT_SIZE);
+  const rowOffset = Math.round((sourcePlot.top - targetRect.top) / FARM_PLOT_SIZE);
+
+  for (let row = 0; row < sourceSize.rows; row += 1) {
+    for (let column = 0; column < sourceSize.columns; column += 1) {
+      const sourceIndex = row * sourceSize.columns + column;
+      const targetIndex = (rowOffset + row) * targetRect.columns + columnOffset + column;
+      if (targetTiles[targetIndex]) {
+        targetTiles[targetIndex] = normalizeFarmPlotTile(sourceTiles[sourceIndex]);
+      }
+    }
+  }
+}
+
+function clearFarmPlotGrowthTimers(plot) {
+  getPlotTiles(plot).forEach((_, index) => clearPlotGrowthTimer(getFarmPlotTileId(plot.id, index)));
+}
+
+function scheduleFarmPlotGrowthTimers(plot) {
+  getPlotTiles(plot).forEach((tile, index) => {
+    if (tile.stage === FARM_STAGE_GROWING && Number.isFinite(tile.growCompleteAt)) {
+      schedulePlotGrowth(tile, getFarmPlotTileId(plot.id, index));
+    }
+  });
+}
+
+function mergeFarmPlots(firstPlot, secondPlot, targetRect) {
+  clearFarmPlotGrowthTimers(firstPlot);
+  clearFarmPlotGrowthTimers(secondPlot);
+
+  const tiles = Array.from({ length: targetRect.area }, () => createEmptyFarmPlotTile());
+  copyFarmPlotTilesInto(tiles, firstPlot, targetRect);
+  copyFarmPlotTilesInto(tiles, secondPlot, targetRect);
+
+  firstPlot.left = targetRect.left;
+  firstPlot.top = targetRect.top;
+  firstPlot.columns = targetRect.columns;
+  firstPlot.rows = targetRect.rows;
+  firstPlot.tiles = tiles;
+  firstPlot.cropId = null;
+  firstPlot.stage = FARM_STAGE_EMPTY;
+  firstPlot.growCompleteAt = null;
+
+  state.farm.plots = state.farm.plots.filter((plot) => plot.id !== secondPlot.id);
+  state.farm.enteringPlotIds = state.farm.enteringPlotIds.filter((plotId) => plotId !== secondPlot.id);
+  scheduleFarmPlotGrowthTimers(firstPlot);
+}
+
+function getJoinableNeighbor(plot) {
+  for (const otherPlot of state.farm.plots) {
+    if (otherPlot.id === plot.id) {
+      continue;
+    }
+
+    const targetRect = getJoinCandidateRect(plot, otherPlot);
+    if (!targetRect) {
+      continue;
+    }
+
+    const isFree = isFarmPlotPositionFreeFromPlots(
+      targetRect,
+      state.farm.plots,
+      plot.id
+    ) || state.farm.plots.every((candidate) => (
+      candidate.id === plot.id ||
+      candidate.id === otherPlot.id ||
+      !rectsOverlapWithGap(
+        targetRect.left,
+        targetRect.top,
+        targetRect.columns * FARM_PLOT_SIZE,
+        targetRect.rows * FARM_PLOT_SIZE,
+        {
+          left: candidate.left,
+          top: candidate.top,
+          width: getFarmPlotSize(candidate).width,
+          height: getFarmPlotSize(candidate).height,
+        },
+        FARM_PLOT_SPAWN_GAP
+      )
+    ));
+
+    if (isFree) {
+      return { otherPlot, targetRect };
+    }
+  }
+
+  return null;
+}
+
+function joinFarmPlotNeighbors(plot) {
+  let didJoin = false;
+  let currentPlot = plot;
+
+  for (let attempts = 0; attempts < FARM_PLOT_MAX_SPAN * FARM_PLOT_MAX_SPAN; attempts += 1) {
+    const joinable = getJoinableNeighbor(currentPlot);
+    if (!joinable) {
+      break;
+    }
+
+    mergeFarmPlots(currentPlot, joinable.otherPlot, joinable.targetRect);
+    didJoin = true;
+    currentPlot = getPlotById(currentPlot.id);
+    if (!currentPlot) {
+      break;
+    }
+  }
+
+  return didJoin;
+}
+
 export function moveFarmPlot(plotId, left, top) {
   const plot = state.farm.plots.find((entry) => entry.id === plotId);
   if (!plot) {
     return false;
   }
 
-  const position = clampFarmPlotToWorkspace({ left, top });
+  const position = clampFarmPlotToWorkspace({ ...plot, left, top });
   plot.left = position.left;
   plot.top = position.top;
+  const didJoin = joinFarmPlotNeighbors(plot);
   saveFarmPlots(state.farm.plots);
+  state.message = didJoin ? "Farm plots joined." : state.message;
   notify();
   return true;
 }
@@ -2581,16 +2904,27 @@ export function getPlotGrowthProgress(plot) {
 
   const remaining = Math.max(0, plot.growCompleteAt - Date.now());
   const total = getPlotGrowthDurationMs(plot);
+  if (total <= 0) {
+    return 100;
+  }
   return Math.max(0, Math.min(100, Math.round((1 - remaining / total) * 100)));
 }
 
-export function spawnFarmPlot(preferredPosition = null) {
+export function spawnFarmPlot(preferredPosition = null, plotSize = {}) {
   const id = `farm-plot-${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
-  const plotPosition = createFarmPlotRecord(id, preferredPosition, state.farm.plots);
+  const dimensions = getFarmPlotSize(plotSize);
+  const plotPosition = createFarmPlotRecord(id, {
+    ...(preferredPosition || {}),
+    columns: dimensions.columns,
+    rows: dimensions.rows,
+  }, state.farm.plots);
   const plot = {
     id,
     left: plotPosition.left,
     top: plotPosition.top,
+    columns: dimensions.columns,
+    rows: dimensions.rows,
+    tiles: Array.from({ length: dimensions.area }, () => createEmptyFarmPlotTile()),
     cropId: null,
     stage: FARM_STAGE_EMPTY,
     growCompleteAt: null,
@@ -2604,7 +2938,8 @@ export function spawnFarmPlot(preferredPosition = null) {
 export function deleteCellByKey(key) {
   const farmPlotIndex = state.farm.plots.findIndex((plot) => plot.id === key);
   if (farmPlotIndex !== -1) {
-    clearPlotGrowthTimer(key);
+    const plot = state.farm.plots[farmPlotIndex];
+    getPlotTiles(plot).forEach((_, index) => clearPlotGrowthTimer(getFarmPlotTileId(plot.id, index)));
     state.farm.plots.splice(farmPlotIndex, 1);
     state.farm.enteringPlotIds = state.farm.enteringPlotIds.filter((plotId) => plotId !== key);
     saveFarmPlots(state.farm.plots);
@@ -2792,6 +3127,17 @@ export function removeShoppingItem(productId) {
   return true;
 }
 
+export function removeAllShoppingItem(productId) {
+  if (!state.shopping.items[productId]) {
+    return false;
+  }
+
+  delete state.shopping.items[productId];
+  state.message = "Removed.";
+  notify();
+  return true;
+}
+
 export function purchaseShoppingList() {
   const entries = Object.entries(state.shopping.items);
   if (entries.length === 0) {
@@ -2833,8 +3179,9 @@ export function purchaseShoppingList() {
   return true;
 }
 
-export function buyLandPlot() {
-  const cost = getNextLandPlotCost();
+export function buyLandPlot(plotSize = {}) {
+  const dimensions = getFarmPlotSize(plotSize);
+  const cost = getFarmPlotCost(dimensions);
   if (state.coins < cost) {
     state.message = `Need ${cost} coins.`;
     notify();
@@ -2842,8 +3189,8 @@ export function buyLandPlot() {
   }
 
   state.coins -= cost;
-  spawnFarmPlot();
-  state.message = `Land plot bought for ${cost} coins.`;
+  spawnFarmPlot(null, dimensions);
+  state.message = `${dimensions.columns}x${dimensions.rows} farm plot bought for ${cost} coins.`;
   notify();
   return true;
 }

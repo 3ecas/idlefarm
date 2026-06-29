@@ -1,8 +1,8 @@
 import { ANIMAL_ITEMS } from "./animals.js";
-import { MATERIALS, getProduct, getProductSellPrice, sortProductsByBuyPrice, sortProductsByCoinValue } from "./catalog.js";
+import { MATERIALS, getProduct, getProductBuyPrice, getProductSellPrice, sortProductsByBuyPrice, sortProductsByCoinValue } from "./catalog.js";
 import { attachSeedInfoTooltip } from "./seedInfoTooltip.js";
 import { CROP_ITEMS } from "./seeds.js";
-import { addProductToSellStand, getSellCellFromPoint } from "./sell.js";
+import { addProductToSellStand } from "./sell.js";
 import { getAnimalPenDropTargetFromPoint } from "./animalPen.js";
 import { getChickenCoopDropTargetFromPoint } from "./chickenCoop.js";
 import {
@@ -22,27 +22,61 @@ import {
   canBuildBakery,
   canBuildChickenCoop,
   canBuildMill,
+  adjustSellItem,
   getBarnItemQuantity,
-  getNextLandPlotCost,
+  getFarmPlotCost,
+  getSellEntries,
+  getSellTotal,
   getShoppingListTotal,
   isBuildingBuilt,
   millWheatToFlour,
   onStateChange,
   purchaseShoppingList,
+  removeAllShoppingItem,
   removeShoppingItem,
+  removeSellItem,
+  sellQueuedItems,
   state,
 } from "./state.js";
 import { getInventoryEntries } from "./inventory.js";
 import { renderEmpty, renderSection } from "./pageShared.js";
 
-const SWITCH_ANIMATION_MS = 180;
-const BASKET_START_POSITION = { left: 540, top: 92 };
 const BARN_DRAG_THRESHOLD = 4;
+const SWITCH_ANIMATION_MS = 180;
 const PANEL_TITLES = {
-  barn: "Barn",
-  shop: "Shop",
-  build: "Build",
+  dashboard: "Dashboard",
 };
+const DASHBOARD_SECTIONS = [
+  { key: "overview", label: "Overview", icon: "▣" },
+  { key: "barn", label: "Barn", icon: "📦" },
+  { key: "shop", label: "Shop", icon: "🛒" },
+  { key: "market", label: "Market", icon: "⚖" },
+  { key: "build", label: "Build", icon: "🔨" },
+];
+const DASHBOARD_BASKET_SECTION = { key: "basket", label: "Basket", icon: "🧺" };
+const BUILD_ICONS = {
+  bakery: "🍞",
+  mill: "⚙",
+  chickenCoop: "🐔",
+  animalPen: "🐄",
+  animalFeeder: "🪣",
+  farmPlot1x1: "▦",
+  farmPlot2x1: "▭",
+  farmPlot2x2: "▦",
+  farmPlot3x3: "▦",
+};
+const DASHBOARD_SHOP_SECTIONS = [
+  { key: "seeds", label: "Seeds" },
+  { key: "animals", label: "Animals" },
+  { key: "materials", label: "Materials" },
+];
+const DASHBOARD_BARN_SECTIONS = [
+  { key: "seeds", label: "Seeds" },
+  { key: "crops", label: "Crops" },
+  { key: "animals", label: "Animals" },
+  { key: "materials", label: "Materials" },
+  { key: "processed", label: "Products" },
+];
 
 const CATEGORY_ORDER = ["seeds", "crops", "materials", "processed", "animals"];
 const BARN_SORTS = [
@@ -52,26 +86,18 @@ const BARN_SORTS = [
   { key: "quantity", label: "Amount" },
 ];
 
-const SHOP_SECTIONS = [
-  { key: "seeds", title: "Seeds", products: () => CROP_ITEMS.map(({ seed }) => seed).sort(sortProductsByBuyPrice) },
-  { key: "animals", title: "Animals", products: () => ANIMAL_ITEMS.map(({ animal }) => animal).sort(sortProductsByBuyPrice) },
-  { key: "materials", title: "Materials", products: () => Object.values(MATERIALS).sort(sortProductsByBuyPrice) },
-  { key: "farm", title: "Farm", products: () => [] },
-];
-
 let activePanel = null;
+let activeDashboardSection = "overview";
+let activeDashboardBarnSection = null;
+let activeDashboardShopSection = null;
+let activeDashboardBuildSection = null;
 let switchTimer = null;
 let barnSortIndex = 0;
-let isBasketOpen = false;
-let basketPosition = { ...BASKET_START_POSITION };
-let basketDrag = null;
 let barnItemDrag = null;
 let sidePanelTooltip = null;
+let dashboardRender = null;
+let dashboardContentRoot = null;
 const collapsedSections = new Set();
-
-function getCategoryClass(product) {
-  return `item-category-${product?.category || "other"}`;
-}
 
 function getCategoryOrder(product) {
   const index = CATEGORY_ORDER.indexOf(product?.category);
@@ -86,27 +112,195 @@ function getDisplayName(product) {
 }
 
 function isBarnSellableProduct(product) {
-  return Boolean(product && (product.category === "crops" || product.category === "processed") && getProductSellPrice(product.id) > 0);
+  return Boolean(product && getProductSellPrice(product.id) > 0);
 }
 
 function isBarnDraggableProduct(product) {
-  return Boolean(product && ["animals", "crops", "processed"].includes(product.category));
+  return Boolean(product && (["animals", "crops", "materials", "processed"].includes(product.category) || isBarnSellableProduct(product)));
 }
 
-function getBarnItemTypeText(product) {
+function formatDuration(ms) {
+  const seconds = Math.round((Number(ms) || 0) / 1000);
+  if (seconds < 60) {
+    return `${seconds}s`;
+  }
+
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  return remainingSeconds > 0 ? `${minutes}m ${remainingSeconds}s` : `${minutes}m`;
+}
+
+function groupEntriesByCategory(entries) {
+  return entries.reduce((groups, entry) => {
+    const category = entry.product?.category || "other";
+    if (!groups[category]) {
+      groups[category] = [];
+    }
+    groups[category].push(entry);
+    return groups;
+  }, {});
+}
+
+function getBarnCategoryEntries() {
+  return groupEntriesByCategory(getSortedBarnEntries());
+}
+
+function getShopProductsForCategory(category) {
+  if (category === "seeds") {
+    return CROP_ITEMS.map(({ seed }) => seed).sort(sortProductsByBuyPrice);
+  }
+
+  if (category === "crops") {
+    return CROP_ITEMS.map(({ crop }) => crop).sort(sortProductsByBuyPrice);
+  }
+
+  if (category === "animals") {
+    return ANIMAL_ITEMS.map(({ animal }) => animal).sort(sortProductsByBuyPrice);
+  }
+
+  if (category === "materials") {
+    return Object.values(MATERIALS).sort(sortProductsByBuyPrice);
+  }
+
+  return [];
+}
+
+function getSectionIcon(sectionKey) {
+  const icons = {
+    seeds: "🌱",
+    crops: "🥬",
+    animals: "🐄",
+    materials: "🪵",
+    processed: "🥚",
+    farmPlots: "▦",
+    production: "⚙",
+    buildAnimals: "🐔",
+  };
+  return icons[sectionKey] || "▣";
+}
+
+function getShopGrowthText(product) {
   if (product?.category === "seeds") {
-    return "Seed";
+    const crop = getProduct(product.cropProductId);
+    return Number.isFinite(crop?.growDurationMs) ? formatDuration(crop.growDurationMs) : "—";
+  }
+
+  if (Number.isFinite(product?.growDurationMs)) {
+    return formatDuration(product.growDurationMs);
+  }
+
+  if (Number.isFinite(product?.productionDurationMs)) {
+    return formatDuration(product.productionDurationMs);
+  }
+
+  if (Number.isFinite(product?.bakeDurationMs)) {
+    return formatDuration(product.bakeDurationMs);
+  }
+
+  return "—";
+}
+
+function getShopDropText(product) {
+  if (product?.category === "seeds") {
+    const crop = getProduct(product.cropProductId);
+    if (!crop) {
+      return "—";
+    }
+    return getCropDropText(crop);
   }
 
   if (product?.category === "crops") {
-    return "Crop";
+    return getCropDropText(product);
   }
 
-  return "";
+  if (product?.category === "animals") {
+    const output = getProduct(product.outputProductId);
+    if (!output) {
+      return "—";
+    }
+    const amount = Number.isFinite(output.productionYieldMax)
+      ? output.productionYieldMax
+      : Number.isFinite(output.productionYieldMin)
+        ? output.productionYieldMin
+        : 1;
+    return `${amount} ${output.marketName}`;
+  }
+
+  return "—";
+}
+
+function getCropDropText(crop) {
+  if (!crop) {
+    return "—";
+  }
+
+  const drops = [];
+  const amount = Number.isFinite(crop.harvestYield) ? crop.harvestYield : 1;
+  drops.push(`${amount} ${crop.marketName}`);
+
+  if (crop.harvestDrops && typeof crop.harvestDrops === "object") {
+    for (const [productId, quantity] of Object.entries(crop.harvestDrops)) {
+      const dropProduct = getProduct(productId);
+      drops.push(`${quantity} ${dropProduct?.marketName || "Item"}`);
+    }
+  }
+
+  return drops.join(", ");
+}
+
+function getSellValueText(product) {
+  if (product?.category === "seeds") {
+    const crop = getProduct(product.cropProductId);
+    const cropSellPrice = crop ? getProductSellPrice(crop.id) : 0;
+    return cropSellPrice > 0 ? `${cropSellPrice}` : "—";
+  }
+
+  const sellPrice = getProductSellPrice(product.id);
+  return sellPrice > 0 ? `${sellPrice}` : "—";
+}
+
+function renderDashboardTableHeader(columns, modifierClass = "") {
+  return `
+    <div class="dashboard-table-header ${modifierClass}">
+      ${columns.map((column) => `<span>${column}</span>`).join("")}
+    </div>
+  `;
+}
+
+function renderDashboardTableRow({
+  product,
+  quantity = "",
+  columns = [],
+  className = "",
+  buttonAttribute = "",
+  variant = "",
+  rowClass = "",
+  name = "",
+}) {
+  const tag = buttonAttribute ? "button" : "div";
+  const typeAttribute = buttonAttribute ? 'type="button"' : "";
+  const label = name || product.inventoryName || product.marketName || "Item";
+  return `
+    <${tag}
+      ${typeAttribute}
+      class="dashboard-table-row ${variant ? `dashboard-table-row--${variant}` : ""} ${buttonAttribute ? "dashboard-table-row--button" : ""} ${className} ${rowClass}"
+      ${buttonAttribute}
+      data-item-info-product="${product.id}"
+    >
+      <span class="dashboard-table-cell dashboard-table-cell--name">
+        <span class="item-name-row dashboard-table-cell__name-row">
+          ${product.icon ? `<span class="item-icon dashboard-table-cell__icon" aria-hidden="true">${product.icon}</span>` : ""}
+          <span class="dashboard-table-cell__name">${label}</span>
+        </span>
+      </span>
+      ${quantity ? `<span class="dashboard-table-cell dashboard-table-cell--quantity">${quantity}</span>` : ""}
+      ${columns.map((value, index) => `<span class="dashboard-table-cell dashboard-table-cell--col${index + 1}">${value}</span>`).join("")}
+    </${tag}>
+  `;
 }
 
 function sectionOpen(sectionKey) {
-  return collapsedSections.has(`${sectionKey}:open`);
+  return !collapsedSections.has(sectionKey);
 }
 
 function renderCollapsibleSection(panelKey, sectionKey, title, body, className = "") {
@@ -133,6 +327,11 @@ function getBarnSellDropTargetFromPoint(x, y) {
   return element?.closest?.("[data-barn-sell-drop]") || null;
 }
 
+function getDashboardMarketDropTargetFromPoint(x, y) {
+  const element = document.elementFromPoint(x, y);
+  return element?.closest?.("[data-dashboard-market-drop]") || null;
+}
+
 function getSortedBarnEntries() {
   const sortMode = BARN_SORTS[barnSortIndex].key;
   const entries = getInventoryEntries();
@@ -157,52 +356,104 @@ function getSortedBarnEntries() {
   });
 }
 
-function renderInventoryTile(product, value, { isButton = false, buttonAttribute = "", className = "", detail = "" } = {}) {
-  const tag = isButton ? "button" : "div";
-  const typeAttribute = isButton ? 'type="button"' : "";
-  return `
-    <${tag}
-      ${typeAttribute}
-      class="panel-item-tile ${isButton ? "panel-item-tile--button" : ""} ${className} ${getCategoryClass(product)}"
-      ${buttonAttribute}
-      data-item-info-product="${product.id}"
-    >
-      <span class="panel-item-tile__bar" aria-hidden="true"></span>
-      <span class="panel-item-tile__name">${getDisplayName(product)}</span>
-      ${detail ? `<span class="panel-item-tile__detail">${detail}</span>` : ""}
-      <span class="panel-item-tile__value">${value}</span>
-    </${tag}>
-  `;
+function sortBarnEntriesForView(entries) {
+  return [...entries].sort((first, second) => {
+    if (barnSortIndex === 0) {
+      return sortProductsByCoinValue(first.product, second.product);
+    }
+    if (barnSortIndex === 1) {
+      return getDisplayName(first.product).localeCompare(getDisplayName(second.product));
+    }
+    if (barnSortIndex === 2) {
+      return getProductSellPrice(first.product.id) - getProductSellPrice(second.product.id)
+        || getDisplayName(first.product).localeCompare(getDisplayName(second.product));
+    }
+    return second.quantity - first.quantity
+      || getDisplayName(first.product).localeCompare(getDisplayName(second.product));
+  });
+}
+
+function renderBarnSection(section) {
+  const entries = getBarnCategoryEntries()[section.key] || [];
+  const body = entries.length > 0
+    ? `
+      <div class="dashboard-table-group" data-dashboard-anchor="barn-${section.key}">
+        ${renderDashboardTableHeader(["Item", "Qty", "Sell"], "dashboard-table-header--barn")}
+        <div class="dashboard-table-list">
+          ${sortBarnEntriesForView(entries)
+            .map(({ product, quantity }) => renderDashboardTableRow({
+              product,
+              quantity: `x${quantity}`,
+              columns: [getProductSellPrice(product.id) > 0 ? `${getProductSellPrice(product.id)}` : "—"],
+              buttonAttribute: isBarnDraggableProduct(product) ? `data-barn-drag-product="${product.id}"` : "",
+              className: isBarnDraggableProduct(product) ? "dashboard-table-row--draggable" : "",
+              variant: "barn",
+              rowClass: `item-category-${product.category || "other"}`,
+            }))
+            .join("")}
+        </div>
+      </div>
+    `
+    : renderEmpty("No items");
+
+  return renderSection(section.label, body, "dashboard-category-section");
 }
 
 function renderBarnPanel() {
-  const entries = getSortedBarnEntries();
+  const entriesByCategory = getBarnCategoryEntries();
+
+  if (!activeDashboardBarnSection) {
+    return `
+      <div class="dashboard-overview-grid dashboard-section-picker">
+        ${DASHBOARD_BARN_SECTIONS
+          .map((section) => {
+            const count = (entriesByCategory[section.key] || []).length;
+            return `
+              <button type="button" class="dashboard-card dashboard-overview-card" data-barn-category="${section.key}">
+                <span class="dashboard-card__header">
+                  <span class="dashboard-card__title-row">
+                    <span class="dashboard-card__icon" aria-hidden="true">${getSectionIcon(section.key)}</span>
+                    <span class="dashboard-card__title">${section.label}</span>
+                  </span>
+                  <span class="dashboard-card__meta">${count} items</span>
+                </span>
+              </button>
+            `;
+          })
+          .join("")}
+      </div>
+    `;
+  }
+
   const sort = BARN_SORTS[barnSortIndex];
+  const section = DASHBOARD_BARN_SECTIONS.find((entry) => entry.key === activeDashboardBarnSection) || DASHBOARD_BARN_SECTIONS[0];
   return `
-    <div class="barn-panel-toolbar">
+    <div class="dashboard-view-toolbar">
+      <button type="button" class="page-action dashboard-back-button" data-dashboard-back="barn">Back</button>
       <button type="button" class="page-action barn-sort-button" data-barn-sort>Sort: ${sort.label}</button>
-      <button
-        type="button"
-        class="barn-send-to-market"
-        data-barn-sell-drop
-        aria-label="Send to market"
-        title="Drop sellable barn items here"
-      >
-        <span class="barn-send-to-market__icon" aria-hidden="true">↗</span>
-        <span class="barn-send-to-market__label">Send to market</span>
-      </button>
     </div>
-    ${
-      entries.length > 0
-        ? `<div class="panel-item-grid">${entries
-            .map(({ product, quantity }) => renderInventoryTile(product, `x${quantity}`, {
-              buttonAttribute: isBarnDraggableProduct(product) ? `data-barn-drag-product="${product.id}"` : "",
-              className: isBarnDraggableProduct(product) ? "panel-item-tile--draggable" : "",
-              detail: getBarnItemTypeText(product),
-            }))
-            .join("")}</div>`
-        : renderEmpty()
-    }
+    <div class="dashboard-section-list">
+      ${renderBarnSection(section)}
+    </div>
+  `;
+}
+
+function renderBarnSendToMarketDropZone() {
+  if (activeDashboardSection !== "barn") {
+    return "";
+  }
+
+  return `
+    <button
+      type="button"
+      class="barn-send-to-market barn-send-to-market--fixed"
+      data-barn-sell-drop
+      aria-label="Send to market"
+      title="Drop sellable barn items here"
+    >
+      <span class="barn-send-to-market__icon" aria-hidden="true">↗</span>
+      <span class="barn-send-to-market__label">Send to market</span>
+    </button>
   `;
 }
 
@@ -216,8 +467,15 @@ function renderShoppingList() {
         ${entries
           .map(({ product, quantity }) => `
             <div class="page-list-row" data-item-info-product="${product.id}">
-              <span>${product.marketName} x${quantity}</span>
-              <button type="button" class="page-action page-action--small" data-shop-remove="${product.id}">-</button>
+              <span class="shopping-item__main">
+                ${product.icon ? `<span class="item-icon shopping-item__icon" aria-hidden="true">${product.icon}</span>` : ""}
+                <span class="shopping-item__name">${product.marketName} x${quantity}</span>
+              </span>
+              <span class="shopping-item__controls" aria-label="${product.marketName} basket controls">
+                <button type="button" class="page-action page-action--small shopping-item__control" data-shop-remove="${product.id}" aria-label="Remove one ${product.marketName}">-</button>
+                <button type="button" class="page-action page-action--small shopping-item__control shopping-item__control--all" data-shop-remove-all="${product.id}" aria-label="Remove all ${product.marketName}">all</button>
+                <button type="button" class="page-action page-action--small shopping-item__control" data-shop-add="${product.id}" aria-label="Add one ${product.marketName}">+</button>
+              </span>
             </div>
           `)
           .join("")}
@@ -233,40 +491,141 @@ function renderShoppingList() {
   `;
 }
 
-function renderShopSection(section) {
-  if (section.key === "farm") {
-    const cost = getNextLandPlotCost();
-    const body = `
-      <div class="panel-item-grid">
-        <button type="button" class="panel-item-tile panel-item-tile--button item-category-farm" data-buy-land-plot data-item-info-product="">
-          <span class="panel-item-tile__bar" aria-hidden="true"></span>
-          <span class="panel-item-tile__name">Land plot</span>
-          <span class="panel-item-tile__value">${cost}</span>
-        </button>
-      </div>
-    `;
-    return renderCollapsibleSection("shop", section.key, section.title, body);
-  }
+function renderSellEntry(product, quantity) {
+  const ownedQuantity = getBarnItemQuantity(product.id);
+  const canIncrease = ownedQuantity > 0;
 
-  const products = section.products();
+  return `
+    <div class="sell-item dashboard-sell-item">
+      <div class="sell-item__main">
+        <span class="sell-item__name-row">
+          ${product.icon ? `<span class="item-icon sell-item__icon" aria-hidden="true">${product.icon}</span>` : ""}
+          <span class="sell-item__name">${product.inventoryName}</span>
+        </span>
+        <span class="sell-item__price">${getProductSellPrice(product.id) * quantity} coins</span>
+      </div>
+      <div class="sell-quantity">
+        <button type="button" class="sell-quantity__button" data-sell-adjust="${product.id}" data-sell-delta="-1" aria-label="Sell fewer ${product.inventoryName}">-</button>
+        <span class="sell-quantity__value">x${quantity}</span>
+        <button type="button" class="sell-quantity__button" data-sell-adjust="${product.id}" data-sell-delta="1" ${canIncrease ? "" : "disabled"} aria-label="Sell more ${product.inventoryName}">+</button>
+        ${canIncrease ? `<button type="button" class="sell-quantity__all" data-sell-all="${product.id}" data-sell-delta="${ownedQuantity}" aria-label="Sell all ${product.inventoryName}">all</button>` : ""}
+        <button type="button" class="sell-item__remove" data-remove-sell-product="${product.id}" aria-label="Remove ${product.inventoryName} from sell list">x</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderMarketPanel() {
+  const entries = getSellEntries().sort((first, second) => sortProductsByCoinValue(first.product, second.product));
+  const total = getSellTotal();
+
+  return `
+    <div class="dashboard-card dashboard-market-card">
+      <div class="dashboard-card__header">
+        <div class="dashboard-card__title-row">
+          <span class="dashboard-card__icon" aria-hidden="true">⚖</span>
+          <span class="dashboard-card__title">Market</span>
+        </div>
+        <span class="dashboard-card__meta">${entries.length} items</span>
+      </div>
+      <div class="dashboard-market-drop" data-dashboard-market-drop>
+        ${
+          entries.length > 0
+            ? entries.map(({ product, quantity }) => renderSellEntry(product, quantity)).join("")
+            : `<div class="sell-empty">Drop crops or products here</div>`
+        }
+      </div>
+      ${
+        entries.length > 0
+          ? `<button type="button" class="sell-action" data-sell-items>Sell for ${total} coins</button>`
+          : ""
+      }
+    </div>
+  `;
+}
+
+function renderShopSection(section) {
+  const products = getShopProductsForCategory(section.key);
+  const availableCoins = state.coins - getShoppingListTotal();
   const body = products.length > 0
-    ? `<div class="panel-item-grid">${products
-        .map((product) => renderInventoryTile(product, product.price, {
-          isButton: true,
-          buttonAttribute: `data-shop-buy="${product.id}"`,
-        }))
-        .join("")}</div>`
+    ? `
+      <div class="dashboard-table-group" data-dashboard-anchor="shop-${section.key}">
+        ${renderDashboardTableHeader(["Item", "Buy", "Grow", "Drop", "Sell"], "dashboard-table-header--shop")}
+        <div class="dashboard-table-list">
+          ${products.map((product) => {
+            const buyPrice = getProductBuyPrice(product);
+            const rowColumns = [
+              buyPrice > 0 ? `${buyPrice}` : "—",
+              getShopGrowthText(product),
+              getShopDropText(product),
+              getSellValueText(product),
+            ];
+            const canBuy = buyPrice > 0 && availableCoins >= buyPrice;
+            return renderDashboardTableRow({
+              product,
+              columns: rowColumns,
+              buttonAttribute: canBuy ? `data-shop-buy="${product.id}"` : "",
+              className: `item-category-${product.category || "other"} ${canBuy ? "dashboard-table-row--buyable" : "dashboard-table-row--info dashboard-table-row--unavailable"}`,
+              variant: "shop",
+              rowClass: `item-category-${product.category || "other"}`,
+              name: getDisplayName(product),
+            });
+          }).join("")}
+        </div>
+      </div>
+    `
     : renderEmpty();
 
-  return renderCollapsibleSection("shop", section.key, section.title, body);
+  return renderSection(section.label, body, "dashboard-category-section");
 }
 
 function renderShopPanel() {
-  return `
-    <div class="shop-panel-layout">
-      <div class="shop-panel-main">
-        ${SHOP_SECTIONS.map(renderShopSection).join("")}
+  if (!activeDashboardShopSection) {
+    return `
+      <div class="dashboard-overview-grid dashboard-section-picker">
+        ${DASHBOARD_SHOP_SECTIONS
+          .map((section) => {
+            const count = getShopProductsForCategory(section.key).length;
+            const icon = section.key === "seeds" ? "🌱" : section.key === "animals" ? "🐄" : "🪵";
+            return `
+              <button type="button" class="dashboard-card dashboard-overview-card" data-shop-category="${section.key}">
+                <span class="dashboard-card__header">
+                  <span class="dashboard-card__title-row">
+                    <span class="dashboard-card__icon" aria-hidden="true">${icon}</span>
+                    <span class="dashboard-card__title">${section.label}</span>
+                  </span>
+                  <span class="dashboard-card__meta">${count} items</span>
+                </span>
+              </button>
+            `;
+          })
+          .join("")}
       </div>
+    `;
+  }
+
+  const section = DASHBOARD_SHOP_SECTIONS.find((entry) => entry.key === activeDashboardShopSection) || DASHBOARD_SHOP_SECTIONS[0];
+  return `
+    <div class="dashboard-view-toolbar">
+      <button type="button" class="page-action dashboard-back-button" data-dashboard-back="shop">Back</button>
+    </div>
+    <div class="shop-panel-layout">
+      ${renderShopSection(section)}
+    </div>
+  `;
+}
+
+function renderBasketPanel() {
+  return `
+    <div class="dashboard-card dashboard-shop-basket">
+      <div class="dashboard-card__header">
+        <div class="dashboard-card__title-row">
+          <span class="dashboard-card__icon" aria-hidden="true">🧺</span>
+          <span class="dashboard-card__title">Basket</span>
+        </div>
+        <span class="dashboard-card__meta">${getShoppingEntries().length} items</span>
+      </div>
+      ${renderShoppingList()}
     </div>
   `;
 }
@@ -274,7 +633,28 @@ function renderShopPanel() {
 function getBuildSections() {
   const wood = getBarnItemQuantity("wood");
   const nails = getBarnItemQuantity("nails");
+  const farmPlotOptions = [
+    { id: "farmPlot1x1", label: "Single Farm Plot", columns: 1, rows: 1 },
+    { id: "farmPlot2x1", label: "2x1 Farm Plot", columns: 2, rows: 1 },
+    { id: "farmPlot2x2", label: "2x2 Farm Plot", columns: 2, rows: 2 },
+    { id: "farmPlot3x3", label: "3x3 Farm Plot", columns: 3, rows: 3 },
+  ].map((option) => {
+    const costValue = getFarmPlotCost({ columns: option.columns, rows: option.rows });
+    return {
+      ...option,
+      kind: "farmPlot",
+      built: false,
+      canBuild: state.coins >= costValue,
+      cost: `${costValue} coins`,
+    };
+  });
+
   return [
+    {
+      key: "farmPlots",
+      title: "Farm Plots",
+      options: farmPlotOptions,
+    },
     {
       key: "production",
       title: "Production",
@@ -326,35 +706,202 @@ function getBuildSections() {
 }
 
 function renderBuildOption(option) {
-  const status = option.built ? "Built" : option.canBuild ? "Ready" : "Need materials";
+  const isDisabled = option.built || !option.canBuild;
+  const actionAttribute = isDisabled
+    ? ""
+    : option.kind === "farmPlot"
+      ? `data-build-farm-plot="${option.id}" data-plot-columns="${option.columns}" data-plot-rows="${option.rows}"`
+      : `data-build-page="${option.id}"`;
+
   return `
-    <button type="button" class="page-item page-item--button build-option-cell ${option.built ? "is-built" : ""}" data-build-page="${option.id}">
+    <button
+      type="button"
+      class="page-item page-item--button build-option-cell ${option.built ? "is-built" : ""} ${isDisabled ? "is-disabled" : ""}"
+      ${actionAttribute}
+      ${isDisabled ? "disabled" : ""}
+    >
       <div class="page-item__main">
-        <span class="page-item__name">${option.label}</span>
+        <span class="item-name-row page-item__name-row">
+          ${BUILD_ICONS[option.id] ? `<span class="item-icon page-item__icon" aria-hidden="true">${BUILD_ICONS[option.id]}</span>` : ""}
+          <span class="page-item__name">${option.label}</span>
+        </span>
         <span class="page-item__meta">${option.cost}</span>
       </div>
-      <span class="build-option-status">${status}</span>
     </button>
   `;
 }
 
 function renderBuildPanel() {
-  return getBuildSections()
-    .map((section) => renderCollapsibleSection("build", section.key, section.title, `
+  const sections = getBuildSections();
+
+  if (!activeDashboardBuildSection) {
+    return `
+      <div class="dashboard-overview-grid dashboard-section-picker">
+        ${sections
+          .map((section) => `
+            <button type="button" class="dashboard-card dashboard-overview-card" data-build-category="${section.key}">
+              <span class="dashboard-card__header">
+                <span class="dashboard-card__title-row">
+                  <span class="dashboard-card__icon" aria-hidden="true">${getSectionIcon(section.key)}</span>
+                  <span class="dashboard-card__title">${section.title}</span>
+                </span>
+                <span class="dashboard-card__meta">${section.options.length} options</span>
+              </span>
+            </button>
+          `)
+          .join("")}
+      </div>
+    `;
+  }
+
+  const section = sections.find((entry) => entry.key === activeDashboardBuildSection) || sections[0];
+  return `
+    <div class="dashboard-view-toolbar">
+      <button type="button" class="page-action dashboard-back-button" data-dashboard-back="build">Back</button>
+    </div>
+    ${renderSection(section.title, `
       <div class="page-item-grid build-option-grid">
         ${section.options.map(renderBuildOption).join("")}
       </div>
-    `))
-    .join("");
+    `, "dashboard-category-section")}
+  `;
+}
+
+function renderDashboardOverview() {
+  const inventoryCount = getInventoryEntries().length;
+  const shoppingCount = getShoppingEntries().length;
+  const sellCount = getSellEntries().length;
+  const builtCount = ["mill", "bakery", "animalFeeder", "animalPen", "chickenCoop"].filter((key) => isBuildingBuilt(key)).length;
+
+  const cards = [
+    { key: "barn", label: "Barn", icon: "📦", meta: `${inventoryCount} items`, detail: "Inventory and drops" },
+    { key: "shop", label: "Shop", icon: "🛒", meta: `${shoppingCount} in basket`, detail: "Buy items and seeds" },
+    { key: "basket", label: "Basket", icon: "🧺", meta: `${shoppingCount} items`, detail: "Review and purchase" },
+    { key: "market", label: "Market", icon: "⚖", meta: `${sellCount} queued`, detail: "Sell crops and products" },
+    { key: "build", label: "Build", icon: "🔨", meta: `${builtCount} built`, detail: "Construct and expand" },
+  ];
+
+  return `
+    <div class="dashboard-overview-grid">
+      ${cards
+        .map((card) => `
+          <button type="button" class="dashboard-card dashboard-overview-card" data-dashboard-section="${card.key}">
+            <span class="dashboard-card__header">
+              <span class="dashboard-card__title-row">
+                <span class="dashboard-card__icon" aria-hidden="true">${card.icon}</span>
+                <span class="dashboard-card__title">${card.label}</span>
+              </span>
+              <span class="dashboard-card__meta">${card.meta}</span>
+            </span>
+            <span class="dashboard-card__detail">${card.detail}</span>
+          </button>
+        `)
+        .join("")}
+    </div>
+  `;
+}
+
+function renderDashboardSection(sectionKey) {
+  if (sectionKey === "overview") {
+    return renderDashboardOverview();
+  }
+
+  if (sectionKey === "barn") {
+    return renderBarnPanel();
+  }
+
+  if (sectionKey === "shop") {
+    return renderShopPanel();
+  }
+
+  if (sectionKey === "basket") {
+    return renderBasketPanel();
+  }
+
+  if (sectionKey === "market") {
+    return renderMarketPanel();
+  }
+
+  if (sectionKey === "build") {
+    return renderBuildPanel();
+  }
+
+  return renderDashboardOverview();
+}
+
+function renderDashboardCategorySubmenu(sectionKey) {
+  return "";
+}
+
+function renderDashboardPanel() {
+  const basketCount = getShoppingEntries().length;
+  return `
+    <div class="dashboard-layout">
+      <aside class="dashboard-sidebar" aria-label="Dashboard sections">
+        <div class="dashboard-sidebar__main">
+          ${DASHBOARD_SECTIONS
+            .map((section) => `
+              <div class="dashboard-sidebar__item">
+                <button
+                  type="button"
+                  class="dashboard-nav-button ${activeDashboardSection === section.key ? "is-active" : ""}"
+                  data-dashboard-section="${section.key}"
+                >
+                  <span class="dashboard-nav-button__icon" aria-hidden="true">${section.icon}</span>
+                  <span class="dashboard-nav-button__label">${section.label}</span>
+                </button>
+                ${renderDashboardCategorySubmenu(section.key)}
+              </div>
+            `)
+            .join("")}
+        </div>
+        <div class="dashboard-sidebar__bottom">
+          <button
+            type="button"
+            class="dashboard-nav-button dashboard-nav-button--basket ${activeDashboardSection === "basket" ? "is-active" : ""}"
+            data-dashboard-section="${DASHBOARD_BASKET_SECTION.key}"
+          >
+            <span class="dashboard-nav-button__icon" aria-hidden="true">${DASHBOARD_BASKET_SECTION.icon}</span>
+            <span class="dashboard-nav-button__label">${DASHBOARD_BASKET_SECTION.label}</span>
+            <span class="dashboard-nav-button__meta">${basketCount}</span>
+          </button>
+        </div>
+      </aside>
+      <div class="dashboard-main">
+        ${renderDashboardSection(activeDashboardSection)}
+      </div>
+      ${renderBarnSendToMarketDropZone()}
+    </div>
+  `;
 }
 
 function renderPanelContent(panelKey) {
-  const renderers = {
-    barn: renderBarnPanel,
-    shop: renderShopPanel,
-    build: renderBuildPanel,
-  };
-  return renderers[panelKey]?.() || "";
+  if (panelKey === "dashboard") {
+    return renderDashboardPanel();
+  }
+
+  return "";
+}
+
+function renderDashboardIfVisible() {
+  if (activePanel === "dashboard" && typeof dashboardRender === "function") {
+    dashboardRender();
+  }
+}
+
+function scrollDashboardSection(sectionKey) {
+  if (!dashboardContentRoot || !sectionKey) {
+    return;
+  }
+
+  const target = dashboardContentRoot.querySelector(`[data-dashboard-anchor="${sectionKey}"]`);
+  if (!target) {
+    return;
+  }
+
+  window.requestAnimationFrame(() => {
+    target.scrollIntoView({ block: "start" });
+  });
 }
 
 function updateTabs(tabRoot, panelKey) {
@@ -370,106 +917,168 @@ function renderActivePanel(panelRoot, contentRoot, titleRoot, tabRoot) {
     return;
   }
 
+  dashboardContentRoot = contentRoot;
   panelRoot.dataset.activePanel = activePanel;
   titleRoot.textContent = PANEL_TITLES[activePanel];
   contentRoot.innerHTML = renderPanelContent(activePanel);
   panelRoot.classList.add("is-open");
   panelRoot.setAttribute("aria-hidden", "false");
   updateTabs(tabRoot, activePanel);
-}
-
-function renderBasketCell(basketRoot) {
-  if (!basketRoot) {
-    return;
-  }
-
-  basketRoot.innerHTML = `
-    <div class="basket-cell__header" data-basket-drag-handle>
-      <span class="basket-cell__title">Basket</span>
-    </div>
-    ${renderShoppingList()}
-  `;
-}
-
-function updateBasketVisibility(basketRoot, basketButton) {
-  const shouldShowButton = activePanel === "shop";
-  if (basketButton) {
-    basketButton.hidden = !shouldShowButton;
-    basketButton.classList.toggle("is-active", shouldShowButton && isBasketOpen);
-    basketButton.setAttribute("aria-expanded", shouldShowButton && isBasketOpen ? "true" : "false");
-    basketButton.setAttribute("aria-label", shouldShowButton && isBasketOpen ? "Hide basket" : "Show basket");
-  }
-
-  if (!basketRoot) {
-    return;
-  }
-
-  const shouldShowBasket = shouldShowButton && isBasketOpen;
-  basketRoot.hidden = !shouldShowBasket;
-  basketRoot.classList.toggle("is-visible", shouldShowBasket);
-  basketRoot.style.left = `${basketPosition.left}px`;
-  basketRoot.style.top = `${basketPosition.top}px`;
-  if (shouldShowBasket) {
-    renderBasketCell(basketRoot);
+  if (activePanel === "dashboard" && activeDashboardSection === "shop" && activeDashboardShopSection) {
+    scrollDashboardSection(`shop-${activeDashboardShopSection}`);
   }
 }
 
-function openBasket(basketRoot, basketButton) {
-  isBasketOpen = true;
-  updateBasketVisibility(basketRoot, basketButton);
-}
-
-function closePanel(panelRoot, tabRoot, basketRoot, basketButton) {
+function closePanel(panelRoot, tabRoot) {
   activePanel = null;
-  isBasketOpen = false;
   window.clearTimeout(switchTimer);
   delete panelRoot.dataset.activePanel;
   panelRoot.classList.remove("is-open");
   panelRoot.setAttribute("aria-hidden", "true");
   updateTabs(tabRoot, null);
-  updateBasketVisibility(basketRoot, basketButton);
 }
 
-function openPanel(panelKey, panelRoot, contentRoot, titleRoot, tabRoot, basketRoot, basketButton) {
+function openPanel(panelKey, panelRoot, contentRoot, titleRoot, tabRoot) {
   window.clearTimeout(switchTimer);
   if (activePanel === panelKey && panelRoot.classList.contains("is-open")) {
-    closePanel(panelRoot, tabRoot, basketRoot, basketButton);
+    closePanel(panelRoot, tabRoot);
     return;
   }
 
   if (activePanel && activePanel !== panelKey && panelRoot.classList.contains("is-open")) {
     panelRoot.classList.remove("is-open");
     activePanel = panelKey;
-    if (panelKey !== "shop") {
-      isBasketOpen = false;
-    }
     updateTabs(tabRoot, panelKey);
-    updateBasketVisibility(basketRoot, basketButton);
     switchTimer = window.setTimeout(() => {
       renderActivePanel(panelRoot, contentRoot, titleRoot, tabRoot);
-      updateBasketVisibility(basketRoot, basketButton);
     }, SWITCH_ANIMATION_MS);
     return;
   }
 
   activePanel = panelKey;
-  if (panelKey !== "shop") {
-    isBasketOpen = false;
-  }
   renderActivePanel(panelRoot, contentRoot, titleRoot, tabRoot);
-  updateBasketVisibility(basketRoot, basketButton);
 }
 
-function handlePanelAction(event, basketRoot = null, basketButton = null) {
+function handlePanelAction(event) {
+  const backButton = event.target.closest("[data-dashboard-back]");
+  if (backButton) {
+    if (backButton.dataset.dashboardBack === "shop") {
+      activeDashboardShopSection = null;
+      renderDashboardIfVisible();
+    }
+    if (backButton.dataset.dashboardBack === "barn") {
+      activeDashboardBarnSection = null;
+      renderDashboardIfVisible();
+    }
+    if (backButton.dataset.dashboardBack === "build") {
+      activeDashboardBuildSection = null;
+      renderDashboardIfVisible();
+    }
+    return;
+  }
+
+  const shopCategoryButton = event.target.closest("[data-shop-category]");
+  if (shopCategoryButton) {
+    activeDashboardSection = "shop";
+    activeDashboardShopSection = shopCategoryButton.dataset.shopCategory;
+    renderDashboardIfVisible();
+    scrollDashboardSection(`shop-${activeDashboardShopSection}`);
+    return;
+  }
+
+  const barnCategoryButton = event.target.closest("[data-barn-category]");
+  if (barnCategoryButton) {
+    activeDashboardSection = "barn";
+    activeDashboardBarnSection = barnCategoryButton.dataset.barnCategory;
+    renderDashboardIfVisible();
+    scrollDashboardSection(`barn-${activeDashboardBarnSection}`);
+    return;
+  }
+
+  const buildCategoryButton = event.target.closest("[data-build-category]");
+  if (buildCategoryButton) {
+    activeDashboardSection = "build";
+    activeDashboardBuildSection = buildCategoryButton.dataset.buildCategory;
+    renderDashboardIfVisible();
+    return;
+  }
+
+  const categorySectionButton = event.target.closest("[data-dashboard-category-section]");
+  if (categorySectionButton) {
+    activeDashboardSection = categorySectionButton.dataset.dashboardCategorySection;
+    const categoryKey = categorySectionButton.dataset.dashboardCategoryKey;
+    if (activeDashboardSection === "barn") {
+      activeDashboardBarnSection = categoryKey;
+    }
+    collapsedSections.delete(`${activeDashboardSection}:${categoryKey}`);
+    renderDashboardIfVisible();
+    scrollDashboardSection(`${activeDashboardSection}-${categoryKey}`);
+    return;
+  }
+
+  const dashboardSectionButton = event.target.closest("[data-dashboard-section]");
+  if (dashboardSectionButton) {
+    activeDashboardSection = dashboardSectionButton.dataset.dashboardSection;
+    if (activeDashboardSection === "shop") {
+      activeDashboardShopSection = null;
+    }
+    if (activeDashboardSection === "barn") {
+      activeDashboardBarnSection = null;
+    }
+    if (activeDashboardSection === "build") {
+      activeDashboardBuildSection = null;
+    }
+    renderDashboardIfVisible();
+    if (activeDashboardSection === "shop" && activeDashboardShopSection) {
+      scrollDashboardSection(`shop-${activeDashboardShopSection}`);
+    }
+    return;
+  }
+
   if (event.target.closest("[data-barn-sort]")) {
     barnSortIndex = (barnSortIndex + 1) % BARN_SORTS.length;
-    event.currentTarget.innerHTML = renderBarnPanel();
+    renderDashboardIfVisible();
+    return;
+  }
+
+  const sellAdjustButton = event.target.closest("[data-sell-adjust]");
+  if (sellAdjustButton) {
+    adjustSellItem(sellAdjustButton.dataset.sellAdjust, Number(sellAdjustButton.dataset.sellDelta));
+    return;
+  }
+
+  const sellAllButton = event.target.closest("[data-sell-all]");
+  if (sellAllButton) {
+    adjustSellItem(sellAllButton.dataset.sellAll, Number(sellAllButton.dataset.sellDelta));
+    return;
+  }
+
+  const removeSellButton = event.target.closest("[data-remove-sell-product]");
+  if (removeSellButton) {
+    removeSellItem(removeSellButton.dataset.removeSellProduct);
+    return;
+  }
+
+  if (event.target.closest("[data-sell-items]")) {
+    sellQueuedItems();
     return;
   }
 
   const removeShoppingButton = event.target.closest("[data-shop-remove]");
   if (removeShoppingButton) {
     removeShoppingItem(removeShoppingButton.dataset.shopRemove);
+    return;
+  }
+
+  const removeAllShoppingButton = event.target.closest("[data-shop-remove-all]");
+  if (removeAllShoppingButton) {
+    removeAllShoppingItem(removeAllShoppingButton.dataset.shopRemoveAll);
+    return;
+  }
+
+  const addShoppingButton = event.target.closest("[data-shop-add]");
+  if (addShoppingButton) {
+    addShoppingItem(addShoppingButton.dataset.shopAdd);
     return;
   }
 
@@ -486,7 +1095,20 @@ function handlePanelAction(event, basketRoot = null, basketButton = null) {
   const buyCell = event.target.closest("[data-shop-buy]");
   if (buyCell) {
     addShoppingItem(buyCell.dataset.shopBuy);
-    openBasket(basketRoot, basketButton);
+    activeDashboardSection = "shop";
+    renderDashboardIfVisible();
+    if (activeDashboardShopSection) {
+      scrollDashboardSection(`shop-${activeDashboardShopSection}`);
+    }
+    return;
+  }
+
+  const buildFarmPlotButton = event.target.closest("[data-build-farm-plot]");
+  if (buildFarmPlotButton) {
+    buyLandPlot({
+      columns: Number(buildFarmPlotButton.dataset.plotColumns),
+      rows: Number(buildFarmPlotButton.dataset.plotRows),
+    });
     return;
   }
 
@@ -503,86 +1125,6 @@ function handlePanelAction(event, basketRoot = null, basketButton = null) {
     animalFeeder: buildAnimalFeeder,
   };
   actions[buildButton.dataset.buildPage]?.();
-}
-
-function handleBasketAction(event) {
-  const removeShoppingButton = event.target.closest("[data-shop-remove]");
-  if (removeShoppingButton) {
-    removeShoppingItem(removeShoppingButton.dataset.shopRemove);
-    return;
-  }
-
-  if (event.target.closest("[data-shop-purchase]")) {
-    purchaseShoppingList();
-  }
-}
-
-function getBasketBounds(element) {
-  return {
-    maxLeft: Math.max(0, window.innerWidth - element.offsetWidth),
-    maxTop: Math.max(0, window.innerHeight - element.offsetHeight),
-  };
-}
-
-function clampBasketPosition(element, left, top) {
-  const bounds = getBasketBounds(element);
-  return {
-    left: Math.min(bounds.maxLeft, Math.max(0, left)),
-    top: Math.min(bounds.maxTop, Math.max(0, top)),
-  };
-}
-
-function handleBasketPointerDown(event) {
-  const basketRoot = event.currentTarget;
-  if (event.button !== 0 || !event.target.closest("[data-basket-drag-handle]")) {
-    return;
-  }
-
-  event.preventDefault();
-  basketDrag = {
-    pointerId: event.pointerId,
-    startX: event.clientX,
-    startY: event.clientY,
-    startLeft: basketPosition.left,
-    startTop: basketPosition.top,
-  };
-  basketRoot.classList.add("is-dragging");
-  try {
-    basketRoot.setPointerCapture(event.pointerId);
-  } catch {
-    // Best effort.
-  }
-}
-
-function handleBasketPointerMove(event) {
-  if (!basketDrag || event.pointerId !== basketDrag.pointerId) {
-    return;
-  }
-
-  const basketRoot = event.currentTarget;
-  basketPosition = clampBasketPosition(
-    basketRoot,
-    basketDrag.startLeft + event.clientX - basketDrag.startX,
-    basketDrag.startTop + event.clientY - basketDrag.startY
-  );
-  basketRoot.style.left = `${basketPosition.left}px`;
-  basketRoot.style.top = `${basketPosition.top}px`;
-  event.preventDefault();
-}
-
-function handleBasketPointerUp(event) {
-  if (!basketDrag || event.pointerId !== basketDrag.pointerId) {
-    return;
-  }
-
-  const basketRoot = event.currentTarget;
-  basketRoot.classList.remove("is-dragging");
-  try {
-    basketRoot.releasePointerCapture(event.pointerId);
-  } catch {
-    // Best effort.
-  }
-  basketDrag = null;
 }
 
 function clearBarnItemDrag() {
@@ -756,12 +1298,14 @@ function handleBarnItemPointerUp(event) {
   const product = getProduct(snapshot.productId);
   if (isBarnSellableProduct(product) && getBarnSellDropTargetFromPoint(event.clientX, event.clientY)) {
     addProductToSellStand(snapshot.productId);
+    renderDashboardIfVisible();
     event.preventDefault();
     return;
   }
 
-  if (isBarnSellableProduct(product) && getSellCellFromPoint(event.clientX, event.clientY)) {
+  if (isBarnSellableProduct(product) && getDashboardMarketDropTargetFromPoint(event.clientX, event.clientY)) {
     addProductToSellStand(snapshot.productId);
+    renderDashboardIfVisible();
   }
 
   event.preventDefault();
@@ -771,7 +1315,7 @@ function handleBarnItemPointerCancel() {
   clearBarnItemDrag();
 }
 
-function handlePanelKeydown(event, basketRoot = null, basketButton = null) {
+function handlePanelKeydown(event) {
   if (event.key !== "Enter" && event.key !== " ") {
     return;
   }
@@ -789,7 +1333,9 @@ function handlePanelKeydown(event, basketRoot = null, basketButton = null) {
 
   event.preventDefault();
   addShoppingItem(buyCell.dataset.shopBuy);
-  openBasket(basketRoot, basketButton);
+  activeDashboardSection = "shop";
+  renderDashboardIfVisible();
+  scrollDashboardSection(`shop-${activeDashboardShopSection}`);
 }
 
 export function mountSidePanels() {
@@ -797,31 +1343,25 @@ export function mountSidePanels() {
   const panelRoot = document.querySelector("[data-side-panel]");
   const contentRoot = document.querySelector("[data-side-panel-content]");
   const titleRoot = document.querySelector("[data-side-panel-title]");
-  const headerRoot = titleRoot?.closest(".side-panel-header");
-  if (!tabRoot || !panelRoot || !contentRoot || !titleRoot || !headerRoot) {
+  if (!tabRoot || !panelRoot || !contentRoot || !titleRoot) {
     return;
   }
 
-  const basketButton = document.createElement("button");
-  basketButton.type = "button";
-  basketButton.className = "basket-toggle";
-  basketButton.dataset.basketToggle = "";
-  basketButton.hidden = true;
-  basketButton.setAttribute("aria-label", "Show basket");
-  basketButton.setAttribute("aria-expanded", "false");
-  basketButton.textContent = "🧺";
-  headerRoot.append(basketButton);
-
-  const basketRoot = document.createElement("aside");
-  basketRoot.className = "basket-cell";
-  basketRoot.dataset.basketCell = "";
-  basketRoot.hidden = true;
-  basketRoot.setAttribute("aria-label", "Basket");
-  document.querySelector(".scene")?.append(basketRoot);
-
   sidePanelTooltip = attachSeedInfoTooltip(contentRoot);
   updateTabs(tabRoot, null);
-  updateBasketVisibility(basketRoot, basketButton);
+
+  const render = () => {
+    if (!activePanel) {
+      contentRoot.innerHTML = "";
+      panelRoot.classList.remove("is-open");
+      panelRoot.setAttribute("aria-hidden", "true");
+      delete panelRoot.dataset.activePanel;
+      return;
+    }
+
+    renderActivePanel(panelRoot, contentRoot, titleRoot, tabRoot);
+  };
+  dashboardRender = render;
 
   tabRoot.addEventListener("click", (event) => {
     const button = event.target.closest("[data-side-tab]");
@@ -829,22 +1369,11 @@ export function mountSidePanels() {
       return;
     }
 
-    openPanel(button.dataset.sideTab, panelRoot, contentRoot, titleRoot, tabRoot, basketRoot, basketButton);
+    openPanel(button.dataset.sideTab, panelRoot, contentRoot, titleRoot, tabRoot);
   });
 
-  basketButton.addEventListener("click", () => {
-    isBasketOpen = !isBasketOpen;
-    updateBasketVisibility(basketRoot, basketButton);
-  });
-
-  basketRoot.addEventListener("click", handleBasketAction);
-  basketRoot.addEventListener("pointerdown", handleBasketPointerDown);
-  basketRoot.addEventListener("pointermove", handleBasketPointerMove);
-  basketRoot.addEventListener("pointerup", handleBasketPointerUp);
-  basketRoot.addEventListener("pointercancel", handleBasketPointerUp);
-
-  contentRoot.addEventListener("click", (event) => handlePanelAction(event, basketRoot, basketButton));
-  contentRoot.addEventListener("keydown", (event) => handlePanelKeydown(event, basketRoot, basketButton));
+  contentRoot.addEventListener("click", handlePanelAction);
+  contentRoot.addEventListener("keydown", handlePanelKeydown);
   contentRoot.addEventListener("pointerdown", handleBarnItemPointerDown);
   contentRoot.addEventListener("toggle", (event) => {
     const section = event.target.closest?.("[data-section-key]");
@@ -853,11 +1382,11 @@ export function mountSidePanels() {
     }
 
     if (section.open) {
-      collapsedSections.add(`${section.dataset.sectionKey}:open`);
+      collapsedSections.delete(section.dataset.sectionKey);
       return;
     }
 
-    collapsedSections.delete(`${section.dataset.sectionKey}:open`);
+    collapsedSections.add(section.dataset.sectionKey);
   }, true);
 
   document.addEventListener("pointerdown", (event) => {
@@ -872,11 +1401,8 @@ export function mountSidePanels() {
       return;
     }
 
-    closePanel(panelRoot, tabRoot, basketRoot, basketButton);
+    closePanel(panelRoot, tabRoot);
   }, { capture: true });
 
-  onStateChange(() => {
-    renderActivePanel(panelRoot, contentRoot, titleRoot, tabRoot);
-    updateBasketVisibility(basketRoot, basketButton);
-  });
+  onStateChange(render);
 }

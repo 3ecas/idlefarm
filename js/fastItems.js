@@ -32,6 +32,7 @@ function getPanelEntries(activeTab) {
 function renderFastItemTile(product) {
   return renderInventoryTile({
     title: product.inventoryName,
+    icon: product.icon,
     action: "+1",
     dataAttributes: `data-fast-item-product="${product.id}" data-item-info-product="${product.id}"`,
     ariaLabel: `Add ${product.inventoryName}`,

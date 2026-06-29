@@ -54,20 +54,22 @@ function getVisibleSellMarketHeight(workspace, bounds) {
 
 function renderSellEntry(product, quantity) {
   const ownedQuantity = getBarnItemQuantity(product.id);
-  const canIncrease = quantity < ownedQuantity;
-  const remainingQuantity = Math.max(0, ownedQuantity - quantity);
+  const canIncrease = ownedQuantity > 0;
 
   return `
     <div class="sell-item">
       <div class="sell-item__main">
-        <span class="sell-item__name">${product.inventoryName}</span>
+        <span class="sell-item__name-row">
+          ${product.icon ? `<span class="item-icon sell-item__icon" aria-hidden="true">${product.icon}</span>` : ""}
+          <span class="sell-item__name">${product.inventoryName}</span>
+        </span>
         <span class="sell-item__price">${getProductSellPrice(product.id) * quantity} coins</span>
       </div>
       <div class="sell-quantity">
         <button type="button" class="sell-quantity__button" data-sell-adjust="${product.id}" data-sell-delta="-1" aria-label="Sell fewer ${product.inventoryName}">-</button>
         <span class="sell-quantity__value">x${quantity}</span>
         <button type="button" class="sell-quantity__button" data-sell-adjust="${product.id}" data-sell-delta="1" ${canIncrease ? "" : "disabled"} aria-label="Sell more ${product.inventoryName}">+</button>
-        ${canIncrease ? `<button type="button" class="sell-quantity__all" data-sell-all="${product.id}" data-sell-delta="${remainingQuantity}" aria-label="Sell all ${product.inventoryName}">all</button>` : ""}
+        ${canIncrease ? `<button type="button" class="sell-quantity__all" data-sell-all="${product.id}" data-sell-delta="${ownedQuantity}" aria-label="Sell all ${product.inventoryName}">all</button>` : ""}
         <button type="button" class="sell-item__remove" data-remove-sell-product="${product.id}" aria-label="Remove ${product.inventoryName} from sell list">x</button>
       </div>
     </div>

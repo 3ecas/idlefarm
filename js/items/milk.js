@@ -1,6 +1,7 @@
 export const milk = {
   id: "milk",
   category: "processed",
+  icon: "🥛",
   marketName: "Milk",
   inventoryName: "Milk",
   price: 0,

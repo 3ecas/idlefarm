@@ -225,7 +225,8 @@ export function mountMovableCell(container, { key, selector, dragHandle = null, 
     }
 
     const interactiveAncestor = event.target.closest("button, summary, input, textarea, select, a, label");
-    if (interactiveAncestor && interactiveAncestor !== cell) {
+    const isFarmPlotTile = Boolean(event.target.closest("[data-plot-tile-id]"));
+    if (interactiveAncestor && interactiveAncestor !== cell && !isFarmPlotTile) {
       return;
     }
 

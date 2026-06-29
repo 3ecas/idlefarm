@@ -49,7 +49,7 @@ function renderAnimalCard(animal) {
 
   return `
     <div class="animal-item" data-chicken-id="${animal.id}">
-      <div class="animal-item__icon" aria-hidden="true">CH</div>
+      <div class="animal-item__icon" aria-hidden="true">${product?.icon || "🐔"}</div>
       <div class="animal-item__name">${label}</div>
       <div class="animal-item__status">${status}</div>
       <span class="animal-item__progress" aria-hidden="true">

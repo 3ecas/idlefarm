@@ -80,7 +80,10 @@ export function renderItemCard({ product, quantity = "", action = "", extra = ""
   return `
     <div class="page-item" data-item-info-product="${product.id}">
       <div class="page-item__main">
-        <span class="page-item__name">${product.inventoryName || product.marketName}</span>
+        <span class="item-name-row page-item__name-row">
+          ${product.icon ? `<span class="item-icon page-item__icon" aria-hidden="true">${product.icon}</span>` : ""}
+          <span class="page-item__name">${product.inventoryName || product.marketName}</span>
+        </span>
         ${quantity ? `<span class="page-item__meta">${quantity}</span>` : ""}
       </div>
       <div class="page-item__side">

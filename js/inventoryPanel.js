@@ -41,6 +41,7 @@ export function renderPanelTabButtons(panelKey, activeTab, tabs = INVENTORY_TABS
 
 export function renderInventoryTile({
   title,
+  icon = "",
   meta = "",
   className = "",
   dataAttributes = "",
@@ -64,7 +65,10 @@ export function renderInventoryTile({
       ${isStatic ? "" : 'draggable="false"'}
       ${ariaLabelAttr}
     >
-      <span class="inventory-tile__name">${displayTitle}</span>
+      <span class="inventory-tile__name-row">
+        ${icon ? `<span class="item-icon inventory-tile__icon" aria-hidden="true">${icon}</span>` : ""}
+        <span class="inventory-tile__name">${displayTitle}</span>
+      </span>
       ${meta ? `<span class="inventory-tile__meta">${meta}</span>` : ""}
       ${actionMarkup}
     </${tagName}>

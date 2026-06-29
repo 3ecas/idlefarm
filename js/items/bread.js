@@ -1,6 +1,7 @@
 export const bread = {
   id: "bread",
   category: "processed",
+  icon: "🍞",
   marketName: "Bread",
   inventoryName: "Bread",
   price: 0,

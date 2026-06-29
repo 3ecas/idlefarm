@@ -1,5 +1,8 @@
 import {
   getCellDragBounds,
+  getFarmPlotSize,
+  getFarmPlotTileById,
+  getFarmPlotTileId,
   getPlotDisplayLabel,
   getPlotGrowthProgress,
   getPlotStatusLabel,
@@ -26,6 +29,50 @@ const PLOT_TOOLTIP_WIDTH = 178;
 const PLOT_TOOLTIP_HEIGHT = 132;
 
 let activeSeedPickerPlotId = null;
+
+function getPlotTileIdFromElement(element) {
+  return element?.closest?.("[data-plot-tile-id]")?.dataset.plotTileId || "";
+}
+
+function getPlotTileIdFromPointer(event, cell) {
+  if (!cell) {
+    return "";
+  }
+
+  const plot = state.farm.plots.find((entry) => entry.id === cell.dataset.cellKey);
+  if (!plot) {
+    return "";
+  }
+
+  const plotSize = getFarmPlotSize(plot);
+  const rect = cell.getBoundingClientRect();
+  const tileWidth = rect.width / plotSize.columns;
+  const tileHeight = rect.height / plotSize.rows;
+  if (!Number.isFinite(tileWidth) || !Number.isFinite(tileHeight) || tileWidth <= 0 || tileHeight <= 0) {
+    return getFarmPlotTileId(plot.id, 0);
+  }
+  const column = Math.max(0, Math.min(plotSize.columns - 1, Math.floor((event.clientX - rect.left) / tileWidth)));
+  const row = Math.max(0, Math.min(plotSize.rows - 1, Math.floor((event.clientY - rect.top) / tileHeight)));
+
+  return getFarmPlotTileId(plot.id, row * plotSize.columns + column);
+}
+
+function getPlotTileIdFromEvent(event, cell = event.target.closest("[data-farm-cell]")) {
+  return getPlotTileIdFromElement(event.target) || getPlotTileIdFromPointer(event, cell);
+}
+
+function getTilePosition(plot, tileIndex, workspace) {
+  const plotSize = getFarmPlotSize(plot);
+  const position = clampToWorkspace(workspace, plot.left, plot.top, plotSize);
+  const column = tileIndex % plotSize.columns;
+  const row = Math.floor(tileIndex / plotSize.columns);
+  return {
+    left: position.left + column * 72,
+    top: position.top + row * 72,
+    width: 72,
+    height: 72,
+  };
+}
 
 function formatRemainingTime(ms) {
   const seconds = Math.max(0, Math.ceil((Number(ms) || 0) / 1000));
@@ -114,10 +161,9 @@ function getPlotTooltipPosition(event) {
   };
 }
 
-function clampToWorkspace(workspace, left, top) {
-  const bounds = getCellDragBounds("farm");
-  const maxLeft = Math.max(0, workspace.clientWidth - bounds.width);
-  const maxTop = Math.max(0, workspace.clientHeight - bounds.height);
+function clampToWorkspace(workspace, left, top, size = getCellDragBounds("farm")) {
+  const maxLeft = Math.max(0, workspace.clientWidth - size.width);
+  const maxTop = Math.max(0, workspace.clientHeight - size.height);
 
   return {
     left: Math.min(maxLeft, Math.max(0, left)),
@@ -147,13 +193,13 @@ function getAvailableSeedEntries() {
     .sort((first, second) => sortProductsByCoinValue(first.seed, second.seed));
 }
 
-function getSeedPickerPosition(workspace, plot) {
-  const position = clampToWorkspace(workspace, plot.left, plot.top);
+function getSeedPickerPosition(workspace, plot, tileIndex = 0) {
+  const position = getTilePosition(plot, tileIndex, workspace);
   const workspaceWidth = workspace?.clientWidth || window.innerWidth;
   const workspaceHeight = workspace?.clientHeight || window.innerHeight;
-  const opensRight = position.left + 72 + SEED_PICKER_GAP + SEED_PICKER_WIDTH <= workspaceWidth - 12;
+  const opensRight = position.left + position.width + SEED_PICKER_GAP + SEED_PICKER_WIDTH <= workspaceWidth - 12;
   const left = opensRight
-    ? position.left + 72 + SEED_PICKER_GAP
+    ? position.left + position.width + SEED_PICKER_GAP
     : Math.max(12, position.left - SEED_PICKER_WIDTH - SEED_PICKER_GAP);
   const top = Math.max(12, Math.min(position.top, workspaceHeight - SEED_PICKER_MAX_HEIGHT - 12));
 
@@ -194,8 +240,8 @@ export function mountPlot(container) {
       return;
     }
 
-    const plot = state.farm.plots.find((entry) => entry.id === hoveredPlotId);
-    if (!plot) {
+    const tileRecord = getFarmPlotTileById(hoveredPlotId);
+    if (!tileRecord) {
       hidePlotTooltip();
       return;
     }
@@ -209,18 +255,18 @@ export function mountPlot(container) {
     }
 
     const position = getPlotTooltipPosition(event);
-    plotTooltipElement.innerHTML = getPlotTooltipContent(plot);
+    plotTooltipElement.innerHTML = getPlotTooltipContent(tileRecord.tile);
     plotTooltipElement.style.left = `${position.left}px`;
     plotTooltipElement.style.top = `${position.top}px`;
   }
 
   function showPlotTooltip(event) {
-    const cell = event.target.closest("[data-farm-cell]");
-    if (!cell) {
+    const tileId = getPlotTileIdFromEvent(event);
+    if (!tileId) {
       return;
     }
 
-    hoveredPlotId = cell.dataset.cellKey;
+    hoveredPlotId = tileId;
     latestTooltipEvent = event;
     isPlotTooltipReady = false;
     if (plotTooltipTimer) {
@@ -243,8 +289,8 @@ export function mountPlot(container) {
   }
 
   function leavePlotTooltip(event) {
-    const cell = event.target.closest("[data-farm-cell]");
-    if (!cell || cell.contains(event.relatedTarget)) {
+    const tile = event.target.closest("[data-plot-tile-id]");
+    if (!tile || tile.contains(event.relatedTarget)) {
       return;
     }
 
@@ -287,21 +333,22 @@ export function mountPlot(container) {
     event.preventDefault();
     event.stopPropagation();
 
-    const plotId = cell.dataset.cellKey;
-    const plot = state.farm.plots.find((entry) => entry.id === plotId);
-    if (!plot) {
+    const plotTileId = getPlotTileIdFromEvent(event, cell);
+    const tileRecord = getFarmPlotTileById(plotTileId);
+    if (!tileRecord) {
       return;
     }
+    const plot = tileRecord.tile;
 
     if (plot.stage === "planted") {
       closeSeedPicker();
-      waterPlot(plotId);
+      waterPlot(plotTileId);
       return;
     }
 
     if (plot.stage === "mature") {
       closeSeedPicker();
-      harvestPlot(plotId);
+      harvestPlot(plotTileId);
       return;
     }
 
@@ -313,11 +360,11 @@ export function mountPlot(container) {
 
     if (state.inventory.selectedItemId) {
       closeSeedPicker();
-      plantSeedFromInventoryOnPlot(plotId, state.inventory.selectedItemId);
+      plantSeedFromInventoryOnPlot(plotTileId, state.inventory.selectedItemId);
       return;
     }
 
-    activeSeedPickerPlotId = activeSeedPickerPlotId === plotId ? null : plotId;
+    activeSeedPickerPlotId = activeSeedPickerPlotId === plotTileId ? null : plotTileId;
     render();
   });
 
@@ -330,14 +377,15 @@ export function mountPlot(container) {
     event.preventDefault();
     event.stopPropagation();
 
-    const plot = state.farm.plots.find((entry) => entry.id === cell.dataset.cellKey);
-    if (!plot || !plot.cropId) {
+    const plotTileId = getPlotTileIdFromEvent(event, cell);
+    const tileRecord = getFarmPlotTileById(plotTileId);
+    if (!tileRecord || !tileRecord.tile.cropId) {
       return;
     }
 
     closeSeedPicker();
-    if (plot.stage === "planted" || plot.stage === "growing") {
-      harvestPlot(plot.id);
+    if (tileRecord.tile.stage === "planted" || tileRecord.tile.stage === "growing") {
+      harvestPlot(plotTileId);
       return;
     }
 
@@ -346,7 +394,8 @@ export function mountPlot(container) {
 
   function render() {
     const workspace = container.closest(".workspace");
-    const seedPickerPlot = state.farm.plots.find((plot) => plot.id === activeSeedPickerPlotId && !plot.cropId) || null;
+    const seedPickerTile = activeSeedPickerPlotId ? getFarmPlotTileById(activeSeedPickerPlotId) : null;
+    const seedPickerPlot = seedPickerTile && !seedPickerTile.tile.cropId ? seedPickerTile.plot : null;
     if (activeSeedPickerPlotId && !seedPickerPlot) {
       activeSeedPickerPlotId = null;
     }
@@ -355,45 +404,63 @@ export function mountPlot(container) {
     container.innerHTML = `
       ${state.farm.plots
         .map((plot) => {
-          const position = clampToWorkspace(workspace, plot.left, plot.top);
+          const plotSize = getFarmPlotSize(plot);
+          const position = clampToWorkspace(workspace, plot.left, plot.top, plotSize);
           const isEntering = state.farm.enteringPlotIds.includes(plot.id);
-          const stage = plot.stage || "empty";
-          const nameLabel = getPlotDisplayLabel(plot);
-          const statusLabel = getPlotStatusLabel(plot);
-          const growthProgress = getPlotGrowthProgress(plot);
-          const statusText = stage === "growing" ? `${statusLabel} ${growthProgress}%` : statusLabel;
-          const ariaLabel = nameLabel ? `Land plot, ${nameLabel}` : "Land plot";
+          const hasGrid = plotSize.area > 1;
+          const tiles = Array.isArray(plot.tiles) && plot.tiles.length === plotSize.area
+            ? plot.tiles
+            : Array.from({ length: plotSize.area }, () => ({ cropId: null, stage: "empty", growCompleteAt: null }));
+          const ariaLabel = `${plotSize.columns} by ${plotSize.rows} land plot`;
 
           return `
-            <button
-              type="button"
-              class="farm-cell farm-cell--${stage} ${isEntering ? "is-entering" : ""}"
+            <div
+              class="farm-cell ${hasGrid ? "farm-cell--grid" : ""} ${isEntering ? "is-entering" : ""}"
               data-cell-key="${plot.id}"
               data-farm-cell
-              style="left:${position.left}px; top:${position.top}px;"
+              style="left:${position.left}px; top:${position.top}px; width:${plotSize.width}px; height:${plotSize.height}px; --plot-columns:${plotSize.columns}; --plot-rows:${plotSize.rows};"
+              role="grid"
               aria-label="${ariaLabel}"
-              data-stage="${stage}"
             >
-              <span class="farm-cell__glyph">${getPlotGlyph(plot)}</span>
-              ${statusText ? `<span class="farm-cell__status farm-cell__status--${stage}">${statusText}</span>` : ""}
-              ${
-                stage === "growing"
-                  ? `
-                    <span class="farm-cell__progress" aria-hidden="true">
-                      <span class="farm-cell__progress-fill" style="width:${growthProgress}%"></span>
-                    </span>
-                  `
-                  : ""
-              }
-              ${nameLabel ? `<span class="farm-cell__label">${nameLabel}</span>` : ""}
-            </button>
+              ${tiles.map((tile, tileIndex) => {
+                const tileId = getFarmPlotTileId(plot.id, tileIndex);
+                const stage = tile.stage || "empty";
+                const nameLabel = getPlotDisplayLabel(tile);
+                const statusLabel = getPlotStatusLabel(tile);
+                const growthProgress = getPlotGrowthProgress(tile);
+                const statusText = stage === "growing" ? `${statusLabel} ${growthProgress}%` : statusLabel;
+                return `
+                  <button
+                    type="button"
+                    class="farm-plot-tile farm-plot-tile--${stage}"
+                    data-plot-tile-id="${tileId}"
+                    data-stage="${stage}"
+                    role="gridcell"
+                    aria-label="${nameLabel ? `${nameLabel}, ${statusLabel || "planted"}` : "Empty farm spot"}"
+                  >
+                    <span class="farm-cell__glyph">${getPlotGlyph(tile)}</span>
+                    ${statusText ? `<span class="farm-cell__status farm-cell__status--${stage}">${statusText}</span>` : ""}
+                    ${
+                      stage === "growing"
+                        ? `
+                          <span class="farm-cell__progress" aria-hidden="true">
+                            <span class="farm-cell__progress-fill" style="width:${growthProgress}%"></span>
+                          </span>
+                        `
+                        : ""
+                    }
+                    ${nameLabel ? `<span class="farm-cell__label">${nameLabel}</span>` : ""}
+                  </button>
+                `;
+              }).join("")}
+            </div>
           `;
         })
         .join("")}
       ${
         seedPickerPlot
           ? (() => {
-              const pickerPosition = getSeedPickerPosition(workspace, seedPickerPlot);
+              const pickerPosition = getSeedPickerPosition(workspace, seedPickerPlot, seedPickerTile?.tileIndex || 0);
               return `
                 <div
                   class="seed-picker"
@@ -412,7 +479,7 @@ export function mountPlot(container) {
                                   type="button"
                                   class="seed-picker__item"
                                   data-seed-choice="${seed.id}"
-                                  data-seed-plot-id="${seedPickerPlot.id}"
+                                  data-seed-plot-id="${activeSeedPickerPlotId}"
                                 >
                                   <span class="seed-picker__name">${seed.marketName}</span>
                                   <span class="seed-picker__meta">x${quantity} · ${crop?.growDurationMs ? `${Math.round(crop.growDurationMs / 1000)}s` : ""}</span>
@@ -463,24 +530,29 @@ export function mountPlot(container) {
 
   function updateProgress() {
     for (const plot of state.farm.plots) {
-      if (plot.stage !== "growing") {
-        continue;
-      }
+      const plotSize = getFarmPlotSize(plot);
+      const tiles = Array.isArray(plot.tiles) && plot.tiles.length === plotSize.area ? plot.tiles : [];
 
-      const cell = container.querySelector(`[data-cell-key="${plot.id}"]`);
-      if (!cell) {
-        continue;
-      }
+      tiles.forEach((tile, tileIndex) => {
+        if (tile.stage !== "growing") {
+          return;
+        }
 
-      const growthProgress = getPlotGrowthProgress(plot);
-      const status = cell.querySelector(".farm-cell__status");
-      const progressFill = cell.querySelector(".farm-cell__progress-fill");
-      if (status) {
-        status.textContent = `${getPlotStatusLabel(plot)} ${growthProgress}%`;
-      }
-      if (progressFill) {
-        progressFill.style.width = `${growthProgress}%`;
-      }
+        const tileElement = container.querySelector(`[data-plot-tile-id="${getFarmPlotTileId(plot.id, tileIndex)}"]`);
+        if (!tileElement) {
+          return;
+        }
+
+        const growthProgress = getPlotGrowthProgress(tile);
+        const status = tileElement.querySelector(".farm-cell__status");
+        const progressFill = tileElement.querySelector(".farm-cell__progress-fill");
+        if (status) {
+          status.textContent = `${getPlotStatusLabel(tile)} ${growthProgress}%`;
+        }
+        if (progressFill) {
+          progressFill.style.width = `${growthProgress}%`;
+        }
+      });
     }
 
     updatePlotTooltip();
