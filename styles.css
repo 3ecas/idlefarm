@@ -12,8 +12,10 @@
   --scene-x: 0px;
   --scene-y: 0px;
   --scene-scale: 1;
-  --scene-width: 2400px;
-  --scene-height: 1800px;
+  --scene-width: 3840px;
+  --scene-height: 3840px;
+  --scene-playfield-size: 3840px;
+  --scene-margin: 720px;
   --scene-grid-size: 24px;
   --scene-grid-x: 0px;
   --scene-grid-y: 0px;
@@ -74,7 +76,7 @@ body.is-panning-scene * {
   height: 100vh;
   overflow: hidden;
   padding-bottom: 76px;
-  background: #fff;
+  background: #cfd4d8;
   transition: background-color 0.4s ease;
 }
 
@@ -93,17 +95,19 @@ body.is-panning-scene * {
 
 .workspace {
   position: absolute;
-  left: 0;
-  top: 0;
-  width: var(--scene-width);
-  height: var(--scene-height);
-  transform: translate(var(--scene-x), var(--scene-y)) scale(var(--scene-scale));
+  left: var(--scene-margin);
+  top: var(--scene-margin);
+  width: var(--scene-playfield-size);
+  height: var(--scene-playfield-size);
+  transform: translate3d(var(--scene-x), var(--scene-y), 0);
   transform-origin: 0 0;
   will-change: transform;
+  background: #fffdf8;
+  box-shadow: 0 0 0 1px rgba(63, 53, 71, 0.08);
 }
 
 .farm-page .workspace {
-  height: var(--scene-height);
+  height: var(--scene-playfield-size);
 }
 
 .farm-page {
@@ -3292,17 +3296,10 @@ button.inventory-item.is-dragging:not(.inventory-item--ghost) {
   bottom: 12px;
   display: grid;
   gap: 8px;
-  width: min(160px, calc(100vw - 24px));
+  width: min(184px, calc(100vw - 24px));
   z-index: 5;
 }
 
-.scene-zoom-controls {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
-}
-
-.scene-zoom-button,
 .restart-farm,
 .delete-zone {
   display: flex;
@@ -3319,13 +3316,10 @@ button.inventory-item.is-dragging:not(.inventory-item--ghost) {
   text-align: center;
 }
 
-.scene-zoom-button,
 .restart-farm {
   cursor: pointer;
 }
 
-.scene-zoom-button:hover,
-.scene-zoom-button:focus-visible,
 .restart-farm:hover,
 .restart-farm:focus-visible {
   border-color: rgba(127, 196, 127, 0.65);
@@ -3412,7 +3406,6 @@ body.is-night .inventory-item,
 body.is-night .barn-section,
 body.is-night .status,
 body.is-night .restart-farm,
-body.is-night .scene-zoom-button,
 body.is-night .delete-zone {
   border-color: rgba(255, 255, 255, 0.58);
   background: rgba(14, 18, 31, 0.96);
@@ -3458,7 +3451,6 @@ body.is-night .inventory-item *,
 body.is-night .barn-section *,
 body.is-night .status *,
 body.is-night .restart-farm *,
-body.is-night .scene-zoom-button *,
 body.is-night .delete-zone * {
   color: #fff;
 }
@@ -3545,8 +3537,6 @@ body.is-night .shopping-item__remove:hover,
 body.is-night .shopping-item__remove:focus-visible,
 body.is-night .restart-farm:hover,
 body.is-night .restart-farm:focus-visible,
-body.is-night .scene-zoom-button:hover,
-body.is-night .scene-zoom-button:focus-visible,
 body.is-night .delete-zone.is-active {
   border-color: rgba(255, 255, 255, 0.78);
   background: #253454;

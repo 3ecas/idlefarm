@@ -1,12 +1,10 @@
 import { onStateChange } from "./state.js";
 
 const CAMERA_STORAGE_KEY = "idle-farm-scene-camera-v1";
-const BASE_SCENE_WIDTH = 2400;
-const BASE_SCENE_HEIGHT = 1800;
+const PLAYFIELD_SIZE = 3840;
 const SCENE_MARGIN = 720;
-const MIN_SCALE = 0.55;
-const MAX_SCALE = 1.75;
-const ZOOM_STEP = 1.16;
+const BASE_SCENE_WIDTH = PLAYFIELD_SIZE + SCENE_MARGIN * 2;
+const BASE_SCENE_HEIGHT = PLAYFIELD_SIZE + SCENE_MARGIN * 2;
 
 let camera = readCamera();
 let sceneSize = { width: BASE_SCENE_WIDTH, height: BASE_SCENE_HEIGHT };
@@ -22,7 +20,7 @@ function readCamera() {
     return {
       x: Number.isFinite(parsed.x) ? parsed.x : 0,
       y: Number.isFinite(parsed.y) ? parsed.y : 0,
-      scale: Number.isFinite(parsed.scale) ? parsed.scale : 1,
+      scale: 1,
     };
   } catch {
     return { x: 0, y: 0, scale: 1 };
@@ -53,75 +51,20 @@ function getViewportSize() {
   };
 }
 
-function getElementWorldRect(element) {
-  return {
-    left: element.offsetLeft,
-    top: element.offsetTop,
-    right: element.offsetLeft + element.offsetWidth,
-    bottom: element.offsetTop + element.offsetHeight,
-  };
-}
-
-function getContentBounds() {
-  const elements = Array.from(workspaceElement?.querySelectorAll("[data-cell-key]") || []);
-  if (elements.length === 0) {
-    const viewport = getViewportSize();
-    const centerX = sceneSize.width / 2;
-    const centerY = sceneSize.height / 2;
-    return {
-      left: centerX - viewport.width / 2,
-      top: centerY - viewport.height / 2,
-      right: centerX + viewport.width / 2,
-      bottom: centerY + viewport.height / 2,
-    };
-  }
-
-  return elements.reduce((bounds, element) => {
-    const rect = getElementWorldRect(element);
-    return {
-      left: Math.min(bounds.left, rect.left),
-      top: Math.min(bounds.top, rect.top),
-      right: Math.max(bounds.right, rect.right),
-      bottom: Math.max(bounds.bottom, rect.bottom),
-    };
-  }, {
-    left: Infinity,
-    top: Infinity,
-    right: -Infinity,
-    bottom: -Infinity,
-  });
-}
-
 function updateSceneSize() {
-  const viewport = getViewportSize();
-  const bounds = getContentBounds();
   sceneSize = {
-    width: Math.max(BASE_SCENE_WIDTH, viewport.width / camera.scale + SCENE_MARGIN * 2, bounds.right + SCENE_MARGIN),
-    height: Math.max(BASE_SCENE_HEIGHT, viewport.height / camera.scale + SCENE_MARGIN * 2, bounds.bottom + SCENE_MARGIN),
+    width: BASE_SCENE_WIDTH,
+    height: BASE_SCENE_HEIGHT,
   };
 }
 
 function clampCameraToBounds() {
   const viewport = getViewportSize();
-  const bounds = getContentBounds();
-  const minX = Math.max(0, bounds.left - SCENE_MARGIN);
-  const minY = Math.max(0, bounds.top - SCENE_MARGIN);
-  const maxX = Math.min(sceneSize.width, Math.max(minX + 1, bounds.right + SCENE_MARGIN));
-  const maxY = Math.min(sceneSize.height, Math.max(minY + 1, bounds.bottom + SCENE_MARGIN));
-  const viewWidth = viewport.width / camera.scale;
-  const viewHeight = viewport.height / camera.scale;
+  const minX = viewport.width - sceneSize.width;
+  const minY = viewport.height - sceneSize.height;
 
-  if (maxX - minX <= viewWidth) {
-    camera.x = viewport.width / 2 - ((minX + maxX) / 2) * camera.scale;
-  } else {
-    camera.x = Math.min(-minX * camera.scale, Math.max(viewport.width - maxX * camera.scale, camera.x));
-  }
-
-  if (maxY - minY <= viewHeight) {
-    camera.y = viewport.height / 2 - ((minY + maxY) / 2) * camera.scale;
-  } else {
-    camera.y = Math.min(-minY * camera.scale, Math.max(viewport.height - maxY * camera.scale, camera.y));
-  }
+  camera.x = Math.min(0, Math.max(minX, camera.x));
+  camera.y = Math.min(0, Math.max(minY, camera.y));
 }
 
 function applyCamera({ shouldSave = true } = {}) {
@@ -129,14 +72,17 @@ function applyCamera({ shouldSave = true } = {}) {
     return;
   }
 
-  workspaceElement.style.setProperty("--scene-width", `${sceneSize.width}px`);
-  workspaceElement.style.setProperty("--scene-height", `${sceneSize.height}px`);
+  camera.x = Math.round(camera.x);
+  camera.y = Math.round(camera.y);
+  workspaceElement.style.setProperty("--scene-width", `${PLAYFIELD_SIZE}px`);
+  workspaceElement.style.setProperty("--scene-height", `${PLAYFIELD_SIZE}px`);
+  workspaceElement.style.setProperty("--scene-playfield-size", `${PLAYFIELD_SIZE}px`);
+  workspaceElement.style.setProperty("--scene-margin", `${SCENE_MARGIN}px`);
   document.documentElement.style.setProperty("--scene-x", `${camera.x}px`);
   document.documentElement.style.setProperty("--scene-y", `${camera.y}px`);
-  document.documentElement.style.setProperty("--scene-scale", `${camera.scale}`);
-  document.documentElement.style.setProperty("--scene-grid-size", `${24 * camera.scale}px`);
-  document.documentElement.style.setProperty("--scene-grid-x", `${camera.x}px`);
-  document.documentElement.style.setProperty("--scene-grid-y", `${camera.y}px`);
+  document.documentElement.style.setProperty("--scene-grid-size", "24px");
+  document.documentElement.style.setProperty("--scene-grid-x", `${camera.x + SCENE_MARGIN}px`);
+  document.documentElement.style.setProperty("--scene-grid-y", `${camera.y + SCENE_MARGIN}px`);
 
   if (shouldSave) {
     saveCamera();
@@ -147,9 +93,10 @@ function refreshCameraBounds({ shouldCenter = false } = {}) {
   updateSceneSize();
   if (shouldCenter) {
     const viewport = getViewportSize();
-    const bounds = getContentBounds();
-    camera.x = viewport.width / 2 - ((bounds.left + bounds.right) / 2) * camera.scale;
-    camera.y = viewport.height / 2 - ((bounds.top + bounds.bottom) / 2) * camera.scale;
+    const centerX = SCENE_MARGIN + PLAYFIELD_SIZE / 2;
+    const centerY = SCENE_MARGIN + PLAYFIELD_SIZE / 2;
+    camera.x = viewport.width / 2 - centerX;
+    camera.y = viewport.height / 2 - centerY;
   }
   clampCameraToBounds();
   applyCamera();
@@ -216,39 +163,6 @@ function endPan(event) {
   document.body.classList.remove("is-panning-scene");
 }
 
-function zoomAt(clientX, clientY, nextScale) {
-  const scale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, nextScale));
-  const worldX = (clientX - camera.x) / camera.scale;
-  const worldY = (clientY - camera.y) / camera.scale;
-  camera.scale = scale;
-  camera.x = clientX - worldX * camera.scale;
-  camera.y = clientY - worldY * camera.scale;
-  updateSceneSize();
-  clampCameraToBounds();
-  applyCamera();
-}
-
-function handleWheel(event) {
-  if (!isScenePanTarget(event)) {
-    return;
-  }
-
-  event.preventDefault();
-  const direction = event.deltaY > 0 ? 1 / ZOOM_STEP : ZOOM_STEP;
-  zoomAt(event.clientX, event.clientY, camera.scale * direction);
-}
-
-function handleZoomButton(event) {
-  const button = event.target.closest("[data-scene-zoom]");
-  if (!button) {
-    return;
-  }
-
-  const viewport = getViewportSize();
-  const direction = button.dataset.sceneZoom === "in" ? ZOOM_STEP : 1 / ZOOM_STEP;
-  zoomAt(viewport.width / 2, viewport.height / 2, camera.scale * direction);
-}
-
 export function mountSceneCamera() {
   workspaceElement = document.getElementById("workspace");
   sceneElement = document.querySelector(".scene");
@@ -261,8 +175,6 @@ export function mountSceneCamera() {
   sceneElement.addEventListener("pointermove", movePan, { passive: false });
   sceneElement.addEventListener("pointerup", endPan);
   sceneElement.addEventListener("pointercancel", endPan);
-  sceneElement.addEventListener("wheel", handleWheel, { passive: false });
-  document.addEventListener("click", handleZoomButton);
   window.addEventListener("resize", () => refreshCameraBounds());
   onStateChange(queueBoundsRefresh);
 }
